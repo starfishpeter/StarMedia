@@ -34,8 +34,14 @@ jobs:
           npm test *>&1 | Tee-Object -FilePath $testLog
           $testExitCode = $LASTEXITCODE
           if ($testExitCode -ne 0) {
-            $tail = (Get-Content -LiteralPath $testLog -Tail 120) -join "`n"
-            $annotation = $tail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            $failure = Get-Content -LiteralPath $testLog | Select-String -Pattern 'not ok|FAIL|failed|AssertionError|failureType|error:|code:|expected:|actual:|operator:' -Context 2,8 | Out-String
+            if (-not $failure.Trim()) {
+              $failure = (Get-Content -LiteralPath $testLog -Tail 40) -join "`n"
+            }
+            if ($failure.Length -gt 3800) {
+              $failure = $failure.Substring(0, 3800)
+            }
+            $annotation = $failure.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
             Write-Output "::error title=StarMedia test failure::$annotation"
             exit $testExitCode
           }
