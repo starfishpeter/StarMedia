@@ -1738,6 +1738,11 @@ select:focus {
   display: grid;
   gap: 2px;
 }
+.scrape-field-editor-heading > .scrape-field-editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
 .scrape-field-editor-heading strong {
   color: var(--text);
   font-size: 13px;

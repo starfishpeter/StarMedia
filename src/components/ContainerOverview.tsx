@@ -2,12 +2,14 @@ import { ChevronLeft, UploadCloud } from 'lucide-react'
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { MediaItem } from '../data'
 import { compareMediaEpisodes, getEpisodeCover, getMediaEpisode } from '../domain/media'
+import { createAllScrapeFields } from '../domain/scrape'
 import { MediaWall } from './MediaWall'
 import { TagEditor } from './TagEditor'
 
 export type ContainerMetadata = { name: string; originalTitle: string; studio: string; firstAiredAt: string }
 type ScrapeDraftValues = Required<StarMediaScrapeFields>
 type ScrapeWritableField = Exclude<keyof ScrapeDraftValues, 'releaseDate'>
+type ScrapeApplyTarget = ScrapeWritableField | 'all'
 type EpisodeSortMode = 'episode' | 'title-asc' | 'title-desc'
 
 const emptyScrapeDraftValues: ScrapeDraftValues = {
@@ -107,8 +109,8 @@ export function ContainerOverview({
   const [scrapePreview, setScrapePreview] = useState<StarMediaScrapePreview | null>(null)
   const [scrapeDraft, setScrapeDraft] = useState<ScrapeDraftValues>(emptyScrapeDraftValues)
   const [scraperStatus, setScraperStatus] = useState<'idle' | 'searching' | 'applying'>('idle')
-  const [applyingField, setApplyingField] = useState<ScrapeWritableField | null>(null)
-  const [lastAppliedField, setLastAppliedField] = useState<ScrapeWritableField | null>(null)
+  const [applyingField, setApplyingField] = useState<ScrapeApplyTarget | null>(null)
+  const [lastAppliedField, setLastAppliedField] = useState<ScrapeApplyTarget | null>(null)
   const [scraperOpen, setScraperOpen] = useState(false)
   const [scraperError, setScraperError] = useState('')
   const [scraperSuccess, setScraperSuccess] = useState('')
@@ -223,11 +225,10 @@ export function ContainerOverview({
     }
   }
 
-  async function applyScrapeField(field: ScrapeWritableField) {
+  async function applyScrapeFields(fields: StarMediaScrapeFields, target: ScrapeApplyTarget) {
     if (!scrapePreview) return
-    const fields: StarMediaScrapeFields = field === 'cover' ? { cover: true } : { [field]: scrapeDraft[field] }
     setScraperStatus('applying')
-    setApplyingField(field)
+    setApplyingField(target)
     setScraperError('')
     setScraperSuccess('')
     try {
@@ -239,9 +240,9 @@ export function ContainerOverview({
         if (scrapePreview.source === 'hanime1') setHanime1Id(String(scrapePreview.subjectId))
         else setFreeAnimeHentaiId(String(scrapePreview.subjectId))
       }
-      if (scrapePreview.title) setScraperQuery(scrapePreview.title)
-      setLastAppliedField(field)
-      const labels: Record<ScrapeWritableField, string> = {
+      setLastAppliedField(target)
+      const labels: Record<ScrapeApplyTarget, string> = {
+        all: '当前来源的全部可用字段',
         cover: '封面',
         affiliation: '合集中文名',
         originalTitle: '原名',
@@ -249,13 +250,28 @@ export function ContainerOverview({
         firstAiredAt: '第一话首播日期',
         note: '简介',
       }
-      setScraperSuccess(`${labels[field]}已写入。`)
+      setScraperSuccess(`${labels[target]}已写入。`)
     } catch (error) {
       setScraperError(error instanceof Error ? error.message : '刮削资料更新失败。')
     } finally {
       setScraperStatus('idle')
       setApplyingField(null)
     }
+  }
+
+  async function applyScrapeField(field: ScrapeWritableField) {
+    const fields: StarMediaScrapeFields = field === 'cover' ? { cover: true } : { [field]: scrapeDraft[field] }
+    await applyScrapeFields(fields, field)
+  }
+
+  async function applyAllScrapeFields() {
+    if (!scrapePreview) return
+    const fields = createAllScrapeFields(scrapePreview, scrapeDraft)
+    if (Object.keys(fields).length === 0) {
+      setScraperError('当前来源没有可写入的字段。')
+      return
+    }
+    await applyScrapeFields(fields, 'all')
   }
 
   async function applyBangumiId(event: FormEvent<HTMLFormElement>) {
@@ -572,9 +588,18 @@ export function ContainerOverview({
                     ID：{scrapePreview.subjectId}
                   </small>
                 </div>
-                <button className="secondary-button tiny-button" onClick={closeScrapePreview} disabled={scraperStatus !== 'idle'}>
-                  取消
-                </button>
+                <div className="scrape-field-editor-actions">
+                  <button
+                    className="primary-button tiny-button"
+                    onClick={() => void applyAllScrapeFields()}
+                    disabled={scraperStatus !== 'idle'}
+                  >
+                    {applyingField === 'all' ? '写入中…' : lastAppliedField === 'all' ? '已填入全部' : '填入全部'}
+                  </button>
+                  <button className="secondary-button tiny-button" onClick={closeScrapePreview} disabled={scraperStatus !== 'idle'}>
+                    取消
+                  </button>
+                </div>
               </div>
               <p className="scrape-field-hint">
                 {scrapePreview.source === 'freeanimehentai'
@@ -594,7 +619,11 @@ export function ContainerOverview({
                   onClick={() => void applyScrapeField('cover')}
                   disabled={scraperStatus !== 'idle' || !scrapePreview.coverUrl}
                 >
-                  {applyingField === 'cover' ? '写入中…' : lastAppliedField === 'cover' ? '已写入' : '写入封面'}
+                  {applyingField === 'cover'
+                    ? '写入中…'
+                    : lastAppliedField === 'cover' || lastAppliedField === 'all'
+                      ? '已写入'
+                      : '写入封面'}
                 </button>
               </div>
               <ScrapeValueRow
@@ -602,7 +631,7 @@ export function ContainerOverview({
                 value={scrapeDraft.affiliation}
                 maxLength={200}
                 applying={applyingField === 'affiliation'}
-                applied={lastAppliedField === 'affiliation'}
+                applied={lastAppliedField === 'affiliation' || lastAppliedField === 'all'}
                 disabled={scraperStatus !== 'idle'}
                 onChange={(value) => setScrapeDraft((current) => ({ ...current, affiliation: value }))}
                 onApply={() => void applyScrapeField('affiliation')}
@@ -612,7 +641,7 @@ export function ContainerOverview({
                 value={scrapeDraft.originalTitle}
                 maxLength={200}
                 applying={applyingField === 'originalTitle'}
-                applied={lastAppliedField === 'originalTitle'}
+                applied={lastAppliedField === 'originalTitle' || lastAppliedField === 'all'}
                 disabled={scraperStatus !== 'idle'}
                 onChange={(value) => setScrapeDraft((current) => ({ ...current, originalTitle: value }))}
                 onApply={() => void applyScrapeField('originalTitle')}
@@ -622,7 +651,7 @@ export function ContainerOverview({
                 value={scrapeDraft.studio}
                 maxLength={200}
                 applying={applyingField === 'studio'}
-                applied={lastAppliedField === 'studio'}
+                applied={lastAppliedField === 'studio' || lastAppliedField === 'all'}
                 disabled={scraperStatus !== 'idle'}
                 onChange={(value) => setScrapeDraft((current) => ({ ...current, studio: value }))}
                 onApply={() => void applyScrapeField('studio')}
@@ -632,7 +661,7 @@ export function ContainerOverview({
                 value={scrapeDraft.firstAiredAt}
                 maxLength={40}
                 applying={applyingField === 'firstAiredAt'}
-                applied={lastAppliedField === 'firstAiredAt'}
+                applied={lastAppliedField === 'firstAiredAt' || lastAppliedField === 'all'}
                 disabled={scraperStatus !== 'idle'}
                 onChange={(value) => setScrapeDraft((current) => ({ ...current, firstAiredAt: value }))}
                 onApply={() => void applyScrapeField('firstAiredAt')}
@@ -643,7 +672,7 @@ export function ContainerOverview({
                 maxLength={1200}
                 multiline
                 applying={applyingField === 'note'}
-                applied={lastAppliedField === 'note'}
+                applied={lastAppliedField === 'note' || lastAppliedField === 'all'}
                 disabled={scraperStatus !== 'idle'}
                 onChange={(value) => setScrapeDraft((current) => ({ ...current, note: value }))}
                 onApply={() => void applyScrapeField('note')}

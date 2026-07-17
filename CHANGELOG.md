@@ -2,6 +2,16 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.23] - 2026-07-17
+
+### 新增
+
+- 每个刮削来源的字段预览面板增加“填入全部”，一次写入该来源提供的全部有效字段。
+
+### 修复
+
+- 单项或全部写入刮削结果后保留原有日语搜索标题，不再切换为当前来源标题。
+
 ## [0.6.22] - 2026-07-17
 
 ### 改进
@@ -50,3 +60,4 @@
 [0.6.20]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.20
 [0.6.21]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.21
 [0.6.22]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.22
+[0.6.23]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.23
