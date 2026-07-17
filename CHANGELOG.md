@@ -2,6 +2,21 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.21] - 2026-07-17
+
+### 新增
+
+- GitHub 最新正式版检查、Release ZIP 下载、SHA-256 校验与自动安装。
+- 受管理媒体库目录扫描，可将新增资源按所在媒体库自动加入导入计划。
+
+### 修复
+
+- 首次刮削并写入合集中文名时，网络刮削面板意外关闭的问题。
+
+### 仓库
+
+- 精简贡献与安全流程文档，README 留待项目说明重写。
+
 ## [0.6.20] - 2026-07-17
 
 ### 新增
@@ -22,3 +37,4 @@
 - 媒体库目录内资源重新导入和缺失文件记录移除问题。
 
 [0.6.20]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.20
+[0.6.21]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.21

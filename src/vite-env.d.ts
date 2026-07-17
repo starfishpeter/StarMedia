@@ -143,6 +143,7 @@ interface StarMediaImportPlanRequest {
   affiliation?: string
   shelf?: string
   replacementItemId?: string
+  scanManagedLibraries?: boolean
 }
 
 interface StarMediaSidecarPlanItem {
@@ -200,6 +201,18 @@ interface StarMediaImportPlan {
   maxImportScanFiles: number
   items: StarMediaImportPlanItem[]
   errors: string[]
+  scanManagedLibraries?: boolean
+}
+
+interface StarMediaGitHubUpdateResult {
+  currentVersion: string
+  latestVersion?: string
+  updateAvailable: boolean
+  releaseFound: boolean
+  releaseUrl?: string
+  publishedAt?: string
+  assetName?: string
+  assetSize?: number
 }
 
 interface StarMediaImportResultItem {
@@ -334,6 +347,15 @@ interface Window {
       snapshotDirectory?: string
       logPath?: string
     }>
+    checkGitHubUpdate?: () => Promise<StarMediaGitHubUpdateResult>
+    installGitHubUpdate?: () => Promise<
+      StarMediaGitHubUpdateResult & {
+        canceled: boolean
+        targetVersion?: string
+        snapshotDirectory?: string
+        logPath?: string
+      }
+    >
     chooseDirectory?: () => Promise<string | null>
     chooseImportSources?: () => Promise<string[]>
     getPathForFile?: (file: File) => string

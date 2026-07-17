@@ -24,6 +24,8 @@ function createPreloadBridge({ invoke, subscribe, getPathForFile }) {
     chooseAppDataBackup: () => call(IPC_CHANNELS.dialogChooseAppDataBackup),
     importAppData: (backupPath) => call(IPC_CHANNELS.appImportData, backupPath),
     installLocalUpdate: () => call(IPC_CHANNELS.appInstallLocalUpdate),
+    checkGitHubUpdate: () => call(IPC_CHANNELS.appCheckGitHubUpdate),
+    installGitHubUpdate: () => call(IPC_CHANNELS.appInstallGitHubUpdate),
     openBook: (id) => call(IPC_CHANNELS.bookOpen, id),
     getBookPage: (sessionId, index, options) =>
       options === undefined ? call(IPC_CHANNELS.bookGetPage, sessionId, index) : call(IPC_CHANNELS.bookGetPage, sessionId, index, options),

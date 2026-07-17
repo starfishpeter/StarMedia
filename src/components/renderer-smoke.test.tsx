@@ -57,6 +57,7 @@ describe('renderer component smoke coverage', () => {
           onSourcePathsChange={noOp}
           onPickSource={noOp}
           onGeneratePlan={noOp}
+          onScanManagedLibraries={noOp}
           onImportRecords={noOp}
           importOperation="idle"
           importProgress={null}

@@ -106,6 +106,8 @@ function App() {
   const [notice, setNotice] = useState<string | null>(null)
   const [exportingAppData, setExportingAppData] = useState(false)
   const [installingLocalUpdate, setInstallingLocalUpdate] = useState(false)
+  const [checkingGitHubUpdate, setCheckingGitHubUpdate] = useState(false)
+  const [githubUpdate, setGitHubUpdate] = useState<StarMediaGitHubUpdateResult | null>(null)
   const [config, setConfig] = useState<StarMediaConfig>(fallbackConfig)
   const [configMeta, setConfigMeta] = useState({ dataRoot: '', configPath: '', backupDir: '', cacheDir: '' })
   const [libraryItems, setLibraryItems] = useState<MediaItem[]>([])
@@ -167,6 +169,7 @@ function App() {
     exportAppData: Boolean(window.starMedia?.exportAppData),
     importAppData: Boolean(window.starMedia?.chooseAppDataBackup && window.starMedia?.importAppData),
     installLocalUpdate: Boolean(window.starMedia?.installLocalUpdate),
+    githubUpdate: Boolean(window.starMedia?.checkGitHubUpdate && window.starMedia?.installGitHubUpdate),
     regenerateThumbnails: Boolean(window.starMedia?.regenerateThumbnails),
     verifyBangumiToken: Boolean(window.starMedia?.openBangumiTokenPage && window.starMedia?.verifyBangumiToken),
   }
@@ -562,6 +565,30 @@ function App() {
     }
   }
 
+  async function scanManagedLibraries() {
+    if (!window.starMedia?.createImportPlan || importStatus === 'scanning') return
+    if (!(await flushConfigSave())) {
+      notify('媒体库设置未能保存。')
+      return
+    }
+    setImportLibrary('auto')
+    setImportSources([])
+    setImportStatus('scanning')
+    setImportError(null)
+    setImportPlan(null)
+    try {
+      const plan = await window.starMedia.createImportPlan({ targetLibrary: 'auto', scanManagedLibraries: true })
+      setImportPlan(plan)
+      setImportStatus('ready')
+      notify(plan.acceptedCount > 0 ? `发现 ${plan.acceptedCount} 个尚未导入的项目。` : '媒体库目录中没有发现新增项目。')
+    } catch (error) {
+      const message = error instanceof Error ? error.message : '扫描媒体库目录失败。'
+      setImportStatus('error')
+      setImportError(message)
+      notify(message)
+    }
+  }
+
   async function importIntoContainer(library: LibraryId, containerName: string, replacementItemId = '') {
     if (!window.starMedia?.chooseImportSources || !window.starMedia?.createImportPlan || !window.starMedia?.importMedia) {
       notify('当前运行环境无法直接导入资源。')
@@ -757,6 +784,41 @@ function App() {
     } catch (error) {
       console.error(error)
       notify(error instanceof Error ? `安装升级包失败：${error.message}` : '安装升级包失败。')
+    } finally {
+      setInstallingLocalUpdate(false)
+    }
+  }
+
+  async function checkGitHubUpdate() {
+    if (!window.starMedia?.checkGitHubUpdate || checkingGitHubUpdate) return
+    setCheckingGitHubUpdate(true)
+    try {
+      const result = await window.starMedia.checkGitHubUpdate()
+      setGitHubUpdate(result)
+      notify(result.updateAvailable ? `发现新版本 ${result.latestVersion}。` : `当前已是最新版本 ${result.currentVersion}。`)
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `检查 GitHub 更新失败：${error.message}` : '检查 GitHub 更新失败。')
+    } finally {
+      setCheckingGitHubUpdate(false)
+    }
+  }
+
+  async function installGitHubUpdate() {
+    if (!window.starMedia?.installGitHubUpdate || installingLocalUpdate) return
+    setInstallingLocalUpdate(true)
+    try {
+      const result = await window.starMedia.installGitHubUpdate()
+      if (result.canceled) return
+      if (!result.updateAvailable) {
+        setGitHubUpdate(result)
+        notify(`当前已是最新版本 ${result.currentVersion}。`)
+        return
+      }
+      notify(`版本 ${result.targetVersion ?? result.latestVersion ?? ''} 已校验，应用即将自动重启。`)
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `安装 GitHub 更新失败：${error.message}` : '安装 GitHub 更新失败。')
     } finally {
       setInstallingLocalUpdate(false)
     }
@@ -1348,6 +1410,10 @@ function App() {
             onImportAppData={importAppData}
             onInstallLocalUpdate={installLocalUpdate}
             installingLocalUpdate={installingLocalUpdate}
+            githubUpdate={githubUpdate}
+            checkingGitHubUpdate={checkingGitHubUpdate}
+            onCheckGitHubUpdate={checkGitHubUpdate}
+            onInstallGitHubUpdate={installGitHubUpdate}
             onRegenerateThumbnails={regenerateThumbnails}
             onClearCaches={clearCaches}
             onOpenBangumiTokenPage={openBangumiTokenPage}
@@ -1367,6 +1433,7 @@ function App() {
             onSourcePathsChange={updateImportSources}
             onPickSource={chooseImportSource}
             onGeneratePlan={generateImportPlan}
+            onScanManagedLibraries={scanManagedLibraries}
             onImportRecords={importMediaRecords}
             importOperation={importOperation}
             importProgress={importProgress}

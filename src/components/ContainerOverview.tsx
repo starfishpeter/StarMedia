@@ -156,7 +156,7 @@ export function ContainerOverview({
     setEditingMetadata(false)
     setMetadataError('')
   })
-  useEffect(() => resetContainerState(), [name, representative?.id])
+  useEffect(() => resetContainerState(), [representative?.id])
   if (!representative) return null
 
   const label = kind === 'affiliation' ? '合集' : '书架'

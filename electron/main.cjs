@@ -41,6 +41,7 @@ const { extractMatroskaSubtitles } = require('./matroska-subtitle-service.cjs')
 const { createThumbnailService, getCurrentArchiveCoverPath } = require('./thumbnail-service.cjs')
 const { createBookCoverThumbnailService } = require('./book-cover-thumbnail-service.cjs')
 const { createLocalUpdateService } = require('./local-update-service.cjs')
+const { createGitHubUpdateService } = require('./github-update-service.cjs')
 
 const isDevelopment = !app.isPackaged
 
@@ -180,6 +181,11 @@ const localUpdateService = createLocalUpdateService({
   updaterScriptPath: path.join(__dirname, 'local-update-runner.ps1'),
 })
 
+const githubUpdateService = createGitHubUpdateService({
+  appVersion: app.getVersion(),
+  fetchWithNetwork: fetchWithSystemNetwork,
+})
+
 const archiveReader = createArchiveReaderCacheService({
   getConfigPaths,
   loadConfig,
@@ -307,21 +313,40 @@ function createImportPlanItem({
 }
 
 async function createImportPlan(input) {
-  const sourcePaths = Array.isArray(input?.sourcePaths)
+  let sourcePaths = Array.isArray(input?.sourcePaths)
     ? input.sourcePaths.map((value) => String(value ?? '').trim()).filter(Boolean)
     : [typeof input?.sourcePath === 'string' ? input.sourcePath.trim() : ''].filter(Boolean)
-  const libraryId = typeof input?.targetLibrary === 'string' ? input.targetLibrary : ''
+  const scanManagedLibraries = input?.scanManagedLibraries === true
+  const libraryId = scanManagedLibraries ? 'auto' : typeof input?.targetLibrary === 'string' ? input.targetLibrary : ''
   const automaticLibrary = libraryId === 'auto'
   const affiliation = typeof input?.affiliation === 'string' ? input.affiliation.trim() : ''
   const shelf = typeof input?.shelf === 'string' ? input.shelf.trim() : ''
   const replacementItemId = typeof input?.replacementItemId === 'string' ? input.replacementItemId.trim() : ''
 
-  if (sourcePaths.length === 0) throw new Error('必须先选择来源文件或目录')
   if (!automaticLibrary && !libraryIds.includes(libraryId)) throw new Error('目标媒体库无效')
 
   const config = await loadConfig()
+  if (scanManagedLibraries) {
+    sourcePaths = [
+      ...new Map(
+        libraryIds
+          .filter((id) => config.libraries[id]?.enabled !== false)
+          .map((id) => String(config.libraries[id]?.rootPath ?? '').trim())
+          .filter((rootPath) => path.isAbsolute(rootPath))
+          .map((rootPath) => [path.resolve(rootPath).toLocaleLowerCase(), path.resolve(rootPath)]),
+      ).values(),
+    ]
+  }
+  if (sourcePaths.length === 0) throw new Error(scanManagedLibraries ? '没有已启用且设置了有效路径的媒体库' : '必须先选择来源文件或目录')
   if (!automaticLibrary && config.libraries[libraryId]?.enabled === false) throw new Error('目标媒体库已停用，请先在设置中启用')
   const targetRoot = automaticLibrary ? '' : (config.libraries[libraryId]?.rootPath ?? '')
+  const indexedLibrary = await loadLibrary()
+  const indexedSourcePaths = new Set(
+    indexedLibrary.items
+      .map((item) => (typeof item?.sourcePath === 'string' ? item.sourcePath : ''))
+      .filter((sourcePath) => path.isAbsolute(sourcePath))
+      .map((sourcePath) => path.resolve(sourcePath).toLocaleLowerCase()),
+  )
   const { scannedFiles, errors, totalFiles, truncated } = await scanImportSources({
     sourcePaths,
     maxFiles: maxImportScanFiles,
@@ -340,6 +365,7 @@ async function createImportPlan(input) {
   }
 
   const allCandidates = scannedFiles.flatMap((file) => {
+    if (scanManagedLibraries && indexedSourcePaths.has(path.resolve(file.filePath).toLocaleLowerCase())) return []
     const managedLibrary = automaticLibrary ? inferManagedLibrary(config, file.filePath, file.extension) : ''
     const inferredLibrary = automaticLibrary
       ? managedLibrary ||
@@ -385,7 +411,6 @@ async function createImportPlan(input) {
   const blockedCount = candidateItems.filter((item) => item.status === 'blocked').length
   const planId = randomUUID()
   const generatedAt = new Date().toISOString()
-  const indexedLibrary = await loadLibrary()
   const replaceableItems = automaticLibrary
     ? indexedLibrary.items
         .filter((item) => item?.kind === 'video' && typeof item.sourcePath === 'string')
@@ -440,6 +465,7 @@ async function createImportPlan(input) {
     maxImportScanFiles,
     items: candidateItems.map((item, index) => ({ id: String(index + 1), ...item })),
     errors,
+    scanManagedLibraries,
   }
   importPlans.set(planId, { plan, createdAt: Date.now() })
   for (const [id, stored] of importPlans) {
@@ -904,6 +930,55 @@ async function installLocalUpdate(owner) {
   }
 }
 
+function publicGitHubRelease(release) {
+  if (!release) return null
+  const result = { ...release }
+  delete result.asset
+  return result
+}
+
+async function checkGitHubUpdate() {
+  if (!app.isPackaged) throw new Error('GitHub 更新只能在打包版中使用')
+  return publicGitHubRelease(await githubUpdateService.checkLatestRelease())
+}
+
+async function installGitHubUpdate(owner) {
+  if (!app.isPackaged) throw new Error('GitHub 更新只能在打包版中使用')
+  if (isPortableDataExportInProgress()) throw new Error('正在导出应用数据，请稍后再升级')
+  const release = await githubUpdateService.checkLatestRelease()
+  if (!release.updateAvailable) return { canceled: false, updateAvailable: false, ...publicGitHubRelease(release) }
+  const sizeMb = (release.assetSize / 1024 / 1024).toFixed(1)
+  const confirmation = await dialog.showMessageBox(owner, {
+    type: 'question',
+    title: '安装 GitHub 更新',
+    message: `发现 StarMedia ${release.latestVersion}，是否下载并安装？`,
+    detail: `更新包约 ${sizeMb} MB。下载后会校验 SHA-256，并再次执行本地升级包结构校验。\n\n程序随后会自动退出、替换应用文件并重新启动；StarMediaData 不会被覆盖。`,
+    buttons: ['下载并安装', '取消'],
+    defaultId: 1,
+    cancelId: 1,
+    noLink: true,
+  })
+  if (confirmation.response !== 0) return { canceled: true, updateAvailable: true, ...publicGitHubRelease(release) }
+
+  let download
+  let prepared
+  try {
+    download = await githubUpdateService.downloadLatestRelease(release)
+    prepared = await localUpdateService.prepareUpdate(download.archivePath)
+    await githubUpdateService.discardDownloadedArchive(download.archivePath)
+    download = null
+    const result = await localUpdateService.launchPreparedUpdate(prepared)
+    localUpdateQuitRequested = true
+    for (const window of BrowserWindow.getAllWindows()) approvedWindowCloses.add(window)
+    setTimeout(() => app.quit(), 250)
+    return { canceled: false, updateAvailable: true, ...result }
+  } catch (error) {
+    if (prepared) await localUpdateService.discardPreparedUpdate(prepared).catch(() => {})
+    if (download?.archivePath) await githubUpdateService.discardDownloadedArchive(download.archivePath).catch(() => {})
+    throw error
+  }
+}
+
 function registerIpc() {
   const handle = (channel, listener) =>
     ipcMain.handle(channel, async (event, ...args) => {
@@ -941,6 +1016,12 @@ function registerIpc() {
 
   handle(IPC_CHANNELS.appInstallLocalUpdate, async (event) =>
     withFileOperationLock(() => installLocalUpdate(BrowserWindow.fromWebContents(event.sender))),
+  )
+
+  handle(IPC_CHANNELS.appCheckGitHubUpdate, async () => checkGitHubUpdate())
+
+  handle(IPC_CHANNELS.appInstallGitHubUpdate, async (event) =>
+    withFileOperationLock(() => installGitHubUpdate(BrowserWindow.fromWebContents(event.sender))),
   )
 
   handle(IPC_CHANNELS.bookOpen, async (_event, id) => openBookForLibrary(id))

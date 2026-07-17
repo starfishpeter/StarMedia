@@ -190,7 +190,23 @@ function parseConfig(value) {
 }
 
 function parseImportPlanRequest(value) {
-  const input = object(value, '导入计划', ['sourcePath', 'sourcePaths', 'targetLibrary', 'affiliation', 'shelf', 'replacementItemId'])
+  const input = object(value, '导入计划', [
+    'sourcePath',
+    'sourcePaths',
+    'targetLibrary',
+    'affiliation',
+    'shelf',
+    'replacementItemId',
+    'scanManagedLibraries',
+  ])
+  if (input.scanManagedLibraries !== undefined && typeof input.scanManagedLibraries !== 'boolean') fail('媒体库扫描选项无效')
+  if (input.scanManagedLibraries === true) {
+    if (input.sourcePath !== undefined || input.sourcePaths !== undefined) fail('扫描媒体库时不能同时指定来源路径')
+    if (input.targetLibrary !== 'auto') fail('扫描媒体库必须使用自动分配')
+    if (input.affiliation !== undefined || input.shelf !== undefined || input.replacementItemId !== undefined)
+      fail('扫描媒体库时不能指定合集、书架或替换目标')
+    return { sourcePaths: [], targetLibrary: 'auto', scanManagedLibraries: true }
+  }
   const hasSourcePath = input.sourcePath !== undefined
   const hasSourcePaths = input.sourcePaths !== undefined
   if (hasSourcePath === hasSourcePaths) fail('必须提供一个来源路径或来源路径列表')
@@ -294,6 +310,8 @@ const IPC_CONTRACTS = Object.freeze({
     parse: (args) => oneArgument(args, (value) => absolutePath(value, '备份路径')),
   },
   'app:installLocalUpdate': { request: [], response: 'StarMediaLocalUpdateResult', parse: noArguments },
+  'app:checkGitHubUpdate': { request: [], response: 'StarMediaGitHubUpdateResult', parse: noArguments },
+  'app:installGitHubUpdate': { request: [], response: 'StarMediaLocalUpdateResult', parse: noArguments },
   'book:open': {
     request: ['mediaId'],
     response: 'StarMediaBookOpenResult',

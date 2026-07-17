@@ -24,6 +24,7 @@ export function ImportView({
   onSourcePathsChange,
   onPickSource,
   onGeneratePlan,
+  onScanManagedLibraries,
   onImportRecords,
   importOperation,
   importProgress,
@@ -40,6 +41,7 @@ export function ImportView({
   onSourcePathsChange: (value: string[]) => void
   onPickSource: () => void
   onGeneratePlan: () => void
+  onScanManagedLibraries: () => void
   onImportRecords: () => void
   importOperation: ImportOperation
   importProgress: ImportProgress | null
@@ -118,7 +120,12 @@ export function ImportView({
                 <FolderOpen size={16} />
                 上传文件/文件夹
               </button>
+              <button className="secondary-button" onClick={onScanManagedLibraries} disabled={!apiAvailable || status === 'scanning'}>
+                <Search size={16} />
+                扫描媒体库目录
+              </button>
             </div>
+            <small>扫描会查找六个受管理媒体库中的新增项目，并按所在目录自动分配。</small>
           </div>
           {sourcePaths.length > 0 && (
             <div className="source-list" aria-label="已选择来源">

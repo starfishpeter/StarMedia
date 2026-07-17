@@ -24,6 +24,7 @@ export type SettingsCapabilities = {
   exportAppData: boolean
   importAppData: boolean
   installLocalUpdate: boolean
+  githubUpdate: boolean
   regenerateThumbnails: boolean
   verifyBangumiToken: boolean
 }
@@ -48,6 +49,10 @@ export function SettingsView({
   onImportAppData,
   onInstallLocalUpdate,
   installingLocalUpdate,
+  githubUpdate,
+  checkingGitHubUpdate,
+  onCheckGitHubUpdate,
+  onInstallGitHubUpdate,
   onRegenerateThumbnails,
   onClearCaches,
   onOpenBangumiTokenPage,
@@ -67,6 +72,10 @@ export function SettingsView({
   onImportAppData: () => void
   onInstallLocalUpdate: () => void
   installingLocalUpdate: boolean
+  githubUpdate: StarMediaGitHubUpdateResult | null
+  checkingGitHubUpdate: boolean
+  onCheckGitHubUpdate: () => void
+  onInstallGitHubUpdate: () => void
   onRegenerateThumbnails: () => void
   onClearCaches: () => void
   onOpenBangumiTokenPage: () => void
@@ -207,19 +216,38 @@ export function SettingsView({
                 <div className="card-title">
                   <PackageOpen size={18} />
                   <div>
-                    <h2>本地升级</h2>
-                    <p>选择新版 StarMedia ZIP，保留应用数据并自动重启。</p>
+                    <h2>应用升级</h2>
+                    <p>从 GitHub 获取正式版，或选择已下载的本地 ZIP。</p>
                   </div>
                 </div>
                 <div className="application-setting-control local-update-control">
-                  <button
-                    className="primary-button"
-                    onClick={onInstallLocalUpdate}
-                    disabled={!capabilities.installLocalUpdate || installingLocalUpdate}
-                  >
-                    {installingLocalUpdate ? '正在校验升级包…' : '选择本地升级包'}
-                  </button>
-                  <small>只接受 StarMedia 官方绿色版 ZIP；升级过程中不会覆盖 StarMediaData。</small>
+                  <div className="data-management-actions">
+                    <button
+                      className="primary-button"
+                      onClick={githubUpdate?.updateAvailable ? onInstallGitHubUpdate : onCheckGitHubUpdate}
+                      disabled={!capabilities.githubUpdate || checkingGitHubUpdate || installingLocalUpdate}
+                    >
+                      {checkingGitHubUpdate
+                        ? '正在检查更新…'
+                        : installingLocalUpdate
+                          ? '正在下载并校验…'
+                          : githubUpdate?.updateAvailable
+                            ? `下载并安装 ${githubUpdate.latestVersion}`
+                            : '检查 GitHub 更新'}
+                    </button>
+                    <button
+                      className="secondary-button"
+                      onClick={onInstallLocalUpdate}
+                      disabled={!capabilities.installLocalUpdate || installingLocalUpdate || checkingGitHubUpdate}
+                    >
+                      选择本地升级包
+                    </button>
+                  </div>
+                  <small>
+                    {githubUpdate && !githubUpdate.updateAvailable
+                      ? `当前版本 ${githubUpdate.currentVersion} 已是最新正式版。`
+                      : '下载后会校验 GitHub 提供的 SHA-256，并再次验证 ZIP 结构；StarMediaData 不会被覆盖。'}
+                  </small>
                 </div>
               </section>
               <section className="application-settings-section application-data-actions">

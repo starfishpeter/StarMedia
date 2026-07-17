@@ -1,5 +1,0 @@
-blank_issues_enabled: false
-contact_links:
-  - name: 私密安全报告
-    url: https://github.com/starfishpeter/StarMedia/security/advisories/new
-    about: 涉及安全漏洞时请使用私密报告，不要创建公开 Issue。

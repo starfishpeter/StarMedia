@@ -25,6 +25,7 @@ tmp/
 
 # Editors, local tooling and operating-system files
 /.codex/
+/doc/接手文档.md
 .idea/
 .vscode/
 .DS_Store

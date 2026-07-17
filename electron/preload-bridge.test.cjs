@@ -23,6 +23,8 @@ test('maps every public invoke API to exactly one declared IPC channel', async (
     [IPC_CHANNELS.appExportData]: () => bridge.exportAppData(),
     [IPC_CHANNELS.appImportData]: () => bridge.importAppData('C:\\backup.zip'),
     [IPC_CHANNELS.appInstallLocalUpdate]: () => bridge.installLocalUpdate(),
+    [IPC_CHANNELS.appCheckGitHubUpdate]: () => bridge.checkGitHubUpdate(),
+    [IPC_CHANNELS.appInstallGitHubUpdate]: () => bridge.installGitHubUpdate(),
     [IPC_CHANNELS.bookOpen]: () => bridge.openBook('book:1'),
     [IPC_CHANNELS.bookGetPage]: () => bridge.getBookPage('00000000-0000-4000-8000-000000000000', 1, { force: true }),
     [IPC_CHANNELS.bookClose]: () => bridge.closeBook('00000000-0000-4000-8000-000000000000'),

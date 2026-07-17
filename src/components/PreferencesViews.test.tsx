@@ -35,6 +35,7 @@ describe('SettingsView', () => {
           exportAppData: true,
           importAppData: true,
           installLocalUpdate: true,
+          githubUpdate: true,
           regenerateThumbnails: true,
           verifyBangumiToken: true,
         }}
@@ -49,6 +50,10 @@ describe('SettingsView', () => {
         onImportAppData={() => {}}
         onInstallLocalUpdate={() => {}}
         installingLocalUpdate={false}
+        githubUpdate={null}
+        checkingGitHubUpdate={false}
+        onCheckGitHubUpdate={() => {}}
+        onInstallGitHubUpdate={() => {}}
         onRegenerateThumbnails={() => {}}
         onClearCaches={() => {}}
         onOpenBangumiTokenPage={() => {}}
@@ -75,6 +80,7 @@ describe('SettingsView', () => {
           exportAppData: false,
           importAppData: true,
           installLocalUpdate: false,
+          githubUpdate: false,
           regenerateThumbnails: false,
           verifyBangumiToken: false,
         }}
@@ -89,6 +95,10 @@ describe('SettingsView', () => {
         onImportAppData={() => {}}
         onInstallLocalUpdate={() => {}}
         installingLocalUpdate={false}
+        githubUpdate={null}
+        checkingGitHubUpdate={false}
+        onCheckGitHubUpdate={() => {}}
+        onInstallGitHubUpdate={() => {}}
         onRegenerateThumbnails={() => {}}
         onClearCaches={() => {}}
         onOpenBangumiTokenPage={() => {}}

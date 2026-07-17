@@ -14,6 +14,8 @@ const IPC_CHANNELS = Object.freeze({
   appExportData: 'app:exportData',
   appImportData: 'app:importData',
   appInstallLocalUpdate: 'app:installLocalUpdate',
+  appCheckGitHubUpdate: 'app:checkGitHubUpdate',
+  appInstallGitHubUpdate: 'app:installGitHubUpdate',
   bookOpen: 'book:open',
   bookGetPage: 'book:getPage',
   bookClose: 'book:close',

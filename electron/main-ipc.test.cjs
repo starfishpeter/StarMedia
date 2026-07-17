@@ -113,7 +113,7 @@ function loadMainWithElectronMock(t) {
     delete require.cache[mainPath]
     return fsPromises.rm(dataRoot, { recursive: true, force: true })
   })
-  return { handlers, main, windows }
+  return { dataRoot, handlers, main, windows }
 }
 
 test('registers every declared IPC handler and rejects untrusted senders before parsing requests', async (t) => {
@@ -172,7 +172,7 @@ test('uses legacy development data only when the current data root has no index'
 })
 
 test('creates import plans through trusted IPC without treating missing sources as ready items', async (t) => {
-  const { handlers, main, windows } = loadMainWithElectronMock(t)
+  const { dataRoot, handlers, main, windows } = loadMainWithElectronMock(t)
   main.createWindow()
   main.registerIpc()
   const window = windows[0]
@@ -212,4 +212,46 @@ test('creates import plans through trusted IPC without treating missing sources 
   assert.equal(managedPlan.items[0].library, 'general')
   assert.equal(managedPlan.items[0].affiliation, 'Existing Series')
   assert.equal(managedPlan.items[0].targetPath, managedSource)
+
+  const animeRoot = path.join(mediaRoot, 'anime')
+  const newManagedSource = path.join(animeRoot, 'New Series', 'episode-01.mkv')
+  await fsPromises.mkdir(path.dirname(newManagedSource), { recursive: true })
+  await fsPromises.writeFile(newManagedSource, 'video')
+  config.libraries.anime.rootPath = animeRoot
+  await handlers.get(IPC_CHANNELS.configSave)(event, config)
+  await fsPromises.writeFile(
+    path.join(dataRoot, 'starmedia-library.json'),
+    `${JSON.stringify({
+      items: [
+        {
+          id: 'existing-managed-item',
+          library: 'general',
+          kind: 'video',
+          title: 'managed',
+          affiliation: 'Existing Series',
+          sourcePath: managedSource,
+        },
+      ],
+      operations: [],
+    })}\n`,
+  )
+
+  const scanPlan = await handlers.get(IPC_CHANNELS.importCreatePlan)(event, {
+    targetLibrary: 'auto',
+    scanManagedLibraries: true,
+  })
+  assert.equal(scanPlan.scanManagedLibraries, true)
+  assert.equal(scanPlan.acceptedCount, 1)
+  assert.equal(scanPlan.items[0].library, 'anime')
+  assert.equal(scanPlan.items[0].affiliation, 'New Series')
+  assert.equal(scanPlan.items[0].sourcePath, newManagedSource)
+  assert.equal(scanPlan.items[0].managedInPlace, true)
+  await assert.rejects(
+    handlers.get(IPC_CHANNELS.importCreatePlan)(event, {
+      sourcePaths: [newManagedSource],
+      targetLibrary: 'auto',
+      scanManagedLibraries: true,
+    }),
+    /IPC 请求无效/,
+  )
 })
