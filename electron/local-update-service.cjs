@@ -82,14 +82,29 @@ async function copyFileIfPresent(source, destination, fileSystem = fs) {
   }
 }
 
-function defaultSpawnUpdater(scriptPath, planPath) {
+function defaultSpawnUpdater(scriptPath, planPath, statusPath) {
   const child = spawn(
     'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-PlanPath', planPath],
+    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-PlanPath', planPath, '-StatusPath', statusPath],
     { detached: true, stdio: 'ignore', windowsHide: true },
   )
   child.unref()
   return child
+}
+
+async function waitForUpdaterReady({ statusPath, fileSystem = fs, timeoutMs = 10000, pollIntervalMs = 50, delay = setTimeout }) {
+  const deadline = Date.now() + timeoutMs
+  while (Date.now() < deadline) {
+    try {
+      const status = (await fileSystem.readFile(statusPath, 'utf8')).replace(/^\uFEFF/, '').trim()
+      if (status === 'ready') return
+      if (status.startsWith('failed:')) throw new Error(status.slice('failed:'.length).trim() || '升级器初始化失败')
+    } catch (error) {
+      if (error?.code !== 'ENOENT') throw error
+    }
+    await new Promise((resolve) => delay(resolve, pollIntervalMs))
+  }
+  throw new Error('升级器未能在 10 秒内启动，请检查安全软件或 PowerShell 设置')
 }
 
 function createLocalUpdateService({
@@ -103,6 +118,7 @@ function createLocalUpdateService({
   fileSystem = fs,
   temporaryDirectory = os.tmpdir,
   spawnUpdater = defaultSpawnUpdater,
+  waitForReady = waitForUpdaterReady,
   now = () => new Date(),
   minimumExecutableBytes = 20 * 1024 * 1024,
 }) {
@@ -192,6 +208,7 @@ function createLocalUpdateService({
     const snapshotDirectory = await createPreUpdateSnapshot(prepared.targetVersion)
     const runnerPath = path.join(prepared.workDirectory, 'local-update-runner.ps1')
     const planPath = path.join(prepared.workDirectory, 'plan.json')
+    const statusPath = path.join(prepared.workDirectory, 'status.txt')
     await fileSystem.copyFile(updaterScriptPath, runnerPath)
     const token = randomUUID()
     const logPath = path.join(updatesDirectory, `update-${now().toISOString().replace(/[:.]/g, '-')}.log`)
@@ -208,8 +225,9 @@ function createLocalUpdateService({
       toVersion: prepared.targetVersion,
     }
     await fileSystem.writeFile(planPath, `${JSON.stringify(plan, null, 2)}\n`, 'utf8')
-    const child = spawnUpdater(runnerPath, planPath)
+    const child = await spawnUpdater(runnerPath, planPath, statusPath)
     if (!child || typeof child.pid !== 'number') throw new Error('无法启动独立升级程序')
+    await waitForReady({ statusPath, fileSystem })
     return { targetVersion: prepared.targetVersion, reinstall: prepared.reinstall, snapshotDirectory, logPath }
   }
 
@@ -221,4 +239,5 @@ module.exports = {
   createLocalUpdateService,
   parseArchiveEntries,
   validateArchiveEntries,
+  waitForUpdaterReady,
 }

@@ -40,6 +40,7 @@ interface StarMediaConfig {
 
 interface StarMediaConfigResult {
   config: StarMediaConfig
+  appVersion?: string
   configPath: string
   libraryPath: string
   backupDir: string

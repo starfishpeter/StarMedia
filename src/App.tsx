@@ -108,6 +108,7 @@ function App() {
   const [installingLocalUpdate, setInstallingLocalUpdate] = useState(false)
   const [checkingGitHubUpdate, setCheckingGitHubUpdate] = useState(false)
   const [githubUpdate, setGitHubUpdate] = useState<StarMediaGitHubUpdateResult | null>(null)
+  const [appVersion, setAppVersion] = useState('')
   const [config, setConfig] = useState<StarMediaConfig>(fallbackConfig)
   const [configMeta, setConfigMeta] = useState({ dataRoot: '', configPath: '', backupDir: '', cacheDir: '' })
   const [libraryItems, setLibraryItems] = useState<MediaItem[]>([])
@@ -267,6 +268,7 @@ function App() {
         currentConfigRef.current = result.config
         configReadyRef.current = true
         setConfig(result.config)
+        setAppVersion(result.appVersion ?? '')
         setConfigMeta({ dataRoot: result.dataRoot, configPath: result.configPath, backupDir: result.backupDir, cacheDir: result.cacheDir })
       } catch (error) {
         console.error(error)
@@ -1398,6 +1400,7 @@ function App() {
           <SettingsView
             config={config}
             configMeta={configMeta}
+            appVersion={appVersion}
             capabilities={settingsCapabilities}
             onChange={setConfig}
             onPickMediaRoot={chooseMediaRoot}

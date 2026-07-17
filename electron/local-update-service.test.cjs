@@ -3,7 +3,16 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
-const { compareVersions, createLocalUpdateService, parseArchiveEntries, validateArchiveEntries } = require('./local-update-service.cjs')
+const { execFile } = require('node:child_process')
+const { promisify } = require('node:util')
+const {
+  compareVersions,
+  createLocalUpdateService,
+  parseArchiveEntries,
+  validateArchiveEntries,
+  waitForUpdaterReady,
+} = require('./local-update-service.cjs')
+const execFileAsync = promisify(execFile)
 
 function archiveListing(entries) {
   return ['archive metadata', '----------', ...entries.map((entry) => `Path = ${entry}`)].join('\n')
@@ -64,6 +73,39 @@ test('compares semantic release versions and rejects malformed versions', () => 
   assert.throws(() => compareVersions('development', '0.6.20'), /版本号格式无效/)
 })
 
+test('waits for updater readiness and surfaces initialization failures', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'starmedia-updater-ready-test-'))
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const statusPath = path.join(root, 'status.txt')
+  await fs.writeFile(statusPath, 'ready')
+  await assert.doesNotReject(waitForUpdaterReady({ statusPath }))
+  await fs.writeFile(statusPath, 'failed:PowerShell 被安全策略阻止')
+  await assert.rejects(waitForUpdaterReady({ statusPath }), /安全策略阻止/)
+})
+
+test('PowerShell runner reports an invalid plan through the handshake file', async (t) => {
+  const root = await fs.mkdtemp(path.join(os.tmpdir(), 'starmedia-updater-runner-test-'))
+  t.after(() => fs.rm(root, { recursive: true, force: true }))
+  const planPath = path.join(root, 'plan.json')
+  const statusPath = path.join(root, 'status.txt')
+  await fs.writeFile(planPath, JSON.stringify({ format: 'invalid' }))
+  await assert.rejects(
+    execFileAsync('powershell.exe', [
+      '-NoProfile',
+      '-NonInteractive',
+      '-ExecutionPolicy',
+      'Bypass',
+      '-File',
+      path.join(__dirname, 'local-update-runner.ps1'),
+      '-PlanPath',
+      planPath,
+      '-StatusPath',
+      statusPath,
+    ]),
+  )
+  assert.match((await fs.readFile(statusPath, 'utf8')).replace(/^\uFEFF/, '').trim(), /^failed:Invalid update plan format/)
+})
+
 test('prepares a validated same-version package for reinstall and rejects downgrades', async (t) => {
   const sandbox = await createSandbox(t)
   const createService = (version) =>
@@ -102,8 +144,9 @@ test('creates a pre-update data snapshot and launches the detached runner with a
     temporaryDirectory: () => sandbox.root,
     minimumExecutableBytes: 1,
     now: () => new Date('2026-07-17T12:00:00.000Z'),
-    spawnUpdater: (scriptPath, planPath) => {
-      launch = { scriptPath, planPath }
+    spawnUpdater: async (scriptPath, planPath, statusPath) => {
+      launch = { scriptPath, planPath, statusPath }
+      await fs.writeFile(statusPath, 'ready')
       return { pid: 9876 }
     },
   })
@@ -119,6 +162,7 @@ test('creates a pre-update data snapshot and launches the detached runner with a
   assert.equal(path.dirname(plan.rollbackDirectory), sandbox.installDirectory)
   assert.match(path.basename(plan.rollbackDirectory), /^\.starmedia-update-rollback-/)
   assert.equal(path.dirname(launch.scriptPath), prepared.workDirectory)
+  assert.equal(path.dirname(launch.statusPath), prepared.workDirectory)
 })
 
 test('refuses to launch when the active data root is not the protected sibling directory', async (t) => {

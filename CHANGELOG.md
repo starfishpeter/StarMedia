@@ -2,6 +2,17 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.22] - 2026-07-17
+
+### 改进
+
+- 设置页的应用数据区域显示当前应用版本。
+
+### 修复
+
+- 本地升级器增加启动握手，避免主程序过早退出导致独立升级进程尚未就绪。
+- 升级器初始化失败时保留主程序并显示具体错误，不再错误提示即将重启。
+
 ## [0.6.21] - 2026-07-17
 
 ### 新增
@@ -38,3 +49,4 @@
 
 [0.6.20]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.20
 [0.6.21]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.21
+[0.6.22]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.22

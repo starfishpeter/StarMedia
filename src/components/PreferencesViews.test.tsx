@@ -27,6 +27,7 @@ describe('SettingsView', () => {
       <SettingsView
         config={config}
         configMeta={{ dataRoot: 'C:\\StarMediaData', configPath: '', backupDir: '', cacheDir: '' }}
+        appVersion="0.6.21"
         capabilities={{
           chooseDirectory: true,
           clearCaches: true,
@@ -64,6 +65,7 @@ describe('SettingsView', () => {
     expect(markup).toContain('应用皮肤')
     expect(markup).toContain('深夜模式')
     expect(markup).toContain('C:\\StarMediaData')
+    expect(markup).toContain('0.6.21')
     expect(markup).toContain('选择本地升级包')
   })
 
@@ -72,6 +74,7 @@ describe('SettingsView', () => {
       <SettingsView
         config={config}
         configMeta={{ dataRoot: '', configPath: '', backupDir: '', cacheDir: '' }}
+        appVersion=""
         capabilities={{
           chooseDirectory: false,
           clearCaches: false,

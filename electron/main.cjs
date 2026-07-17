@@ -988,7 +988,7 @@ function registerIpc() {
 
   handle(IPC_CHANNELS.configLoad, async () => {
     const paths = getConfigPaths()
-    return { config: await loadConfig(), ...paths }
+    return { config: await loadConfig(), appVersion: app.getVersion(), ...paths }
   })
 
   handle(IPC_CHANNELS.configSave, async (_event, config) => withFileOperationLock(() => saveConfig(config)))

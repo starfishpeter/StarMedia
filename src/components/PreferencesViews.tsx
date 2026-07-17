@@ -37,6 +37,7 @@ function formatConfigTime(value: string) {
 export function SettingsView({
   config,
   configMeta,
+  appVersion,
   capabilities,
   onChange,
   onPickMediaRoot,
@@ -60,6 +61,7 @@ export function SettingsView({
 }: {
   config: StarMediaConfig
   configMeta: { dataRoot: string; configPath: string; backupDir: string; cacheDir: string }
+  appVersion: string
   capabilities: SettingsCapabilities
   onChange: (config: StarMediaConfig) => void
   onPickMediaRoot: () => void
@@ -173,6 +175,10 @@ export function SettingsView({
                 </div>
                 <div className="application-setting-control">
                   <dl className="config-meta compact-config-meta">
+                    <div>
+                      <dt>当前版本</dt>
+                      <dd>{appVersion || '开发版本'}</dd>
+                    </div>
                     <div>
                       <dt>应用数据目录</dt>
                       <dd>{configMeta.dataRoot || '程序目录下的 StarMediaData'}</dd>
