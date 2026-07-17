@@ -28,7 +28,17 @@ jobs:
         run: npm ci
 
       - name: Test
-        run: npm test
+        shell: pwsh
+        run: |
+          $testLog = Join-Path $env:RUNNER_TEMP 'starmedia-tests.log'
+          npm test *>&1 | Tee-Object -FilePath $testLog
+          $testExitCode = $LASTEXITCODE
+          if ($testExitCode -ne 0) {
+            $tail = (Get-Content -LiteralPath $testLog -Tail 120) -join "`n"
+            $annotation = $tail.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=StarMedia test failure::$annotation"
+            exit $testExitCode
+          }
 
       - name: Type check
         run: npm run typecheck
