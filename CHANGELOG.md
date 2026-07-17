@@ -2,6 +2,12 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.25] - 2026-07-17
+
+### 改进
+
+- 侧栏媒体库图标统一使用首页的灰白色导航样式，选中时仍使用应用强调色。
+
 ## [0.6.24] - 2026-07-17
 
 ### 新增
@@ -72,3 +78,4 @@
 [0.6.22]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.22
 [0.6.23]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.23
 [0.6.24]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.24
+[0.6.25]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.25

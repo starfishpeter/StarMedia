@@ -1347,7 +1347,6 @@ function App() {
               label={library.label}
               icon={<library.icon size={20} />}
               active={activeNavigation === library.id}
-              color={library.color}
               onClick={() => selectNavigation(library.id)}
             />
           ))}
@@ -1667,20 +1666,16 @@ function NavigationButton({
   label,
   icon,
   active = false,
-  color,
   onClick,
 }: {
   label: string
   icon: React.ReactNode
   active?: boolean
-  color?: string
   onClick: () => void
 }) {
   return (
     <button className={`navigation-button ${active ? 'active' : ''}`} onClick={onClick} title={label}>
-      <span className="navigation-icon" style={color ? { color } : undefined}>
-        {icon}
-      </span>
+      <span className="navigation-icon">{icon}</span>
       <span className="navigation-label">{label}</span>
     </button>
   )
