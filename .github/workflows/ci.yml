@@ -34,7 +34,7 @@ jobs:
           npm test *>&1 | Tee-Object -FilePath $testLog
           $testExitCode = $LASTEXITCODE
           if ($testExitCode -ne 0) {
-            $failure = Get-Content -LiteralPath $testLog | Select-String -Pattern 'not ok|FAIL|failed|AssertionError|failureType|error:|code:|expected:|actual:|operator:' -Context 2,8 | Out-String
+            $failure = Get-Content -LiteralPath $testLog | Select-String -Pattern '^not ok|^ FAIL |AssertionError|^\s+failureType:|^\s+error:|^\s+code:|^\s+expected:|^\s+actual:|^\s+operator:|^\s+at ' -Context 2,8 | Out-String
             if (-not $failure.Trim()) {
               $failure = (Get-Content -LiteralPath $testLog -Tail 40) -join "`n"
             }
