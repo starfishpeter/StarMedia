@@ -125,7 +125,6 @@ export function ImportView({
                 扫描媒体库目录
               </button>
             </div>
-            <small>扫描会查找六个受管理媒体库中的新增项目，并按所在目录自动分配。</small>
           </div>
           {sourcePaths.length > 0 && (
             <div className="source-list" aria-label="已选择来源">

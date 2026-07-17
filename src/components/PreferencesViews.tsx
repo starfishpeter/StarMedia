@@ -36,6 +36,10 @@ function formatConfigTime(value: string) {
   return Number.isNaN(date.getTime()) ? '尚未保存' : configDateLabel.format(date)
 }
 
+function normalizeProxyInput(value: string) {
+  return value.replace(/^\s*(?:https?:\/\/)+/i, 'http://')
+}
+
 export function SettingsView({
   config,
   configMeta,
@@ -438,9 +442,13 @@ export function SettingsView({
                 <label className="settings-field">
                   <span>代理地址</span>
                   <input
+                    name="starmedia-network-proxy"
                     value={config.network.proxyUrl}
-                    onChange={(event) => onChange({ ...config, network: { ...config.network, proxyUrl: event.target.value } })}
+                    onChange={(event) =>
+                      onChange({ ...config, network: { ...config.network, proxyUrl: normalizeProxyInput(event.target.value) } })
+                    }
                     placeholder="http://127.0.0.1:8390"
+                    autoComplete="off"
                     spellCheck={false}
                   />
                 </label>
@@ -453,7 +461,9 @@ export function SettingsView({
                     {testingProxy ? '测试中…' : '测试 GitHub 连接'}
                   </button>
                 </div>
-                <small className="network-proxy-help">FlClash 混合端口推荐填入 http://127.0.0.1:8390，也支持 socks5:// 地址。</small>
+                <small className="network-proxy-help">
+                  FlClash 混合端口推荐填入 http://127.0.0.1:8390，也支持 socks5:// 地址；Bangumi 始终直连。
+                </small>
                 {proxyStatus && <p className="proxy-status">{proxyStatus}</p>}
               </div>
             </article>

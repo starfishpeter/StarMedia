@@ -34,7 +34,7 @@ export function VideoPlayer({
   const suppressVideoClickRef = useRef(false)
   const selectedRateRef = useRef(1)
   const [playbackError, setPlaybackError] = useState(false)
-  const [fitMode, setFitMode] = useState<'contain' | 'cover'>('contain')
+  const [fitMode, setFitMode] = useState<'contain' | 'native'>('contain')
   const [playbackRate, setPlaybackRate] = useState(1)
   const [selectedSubtitle, setSelectedSubtitle] = useState('off')
   const [isPlaying, setIsPlaying] = useState(false)
@@ -269,10 +269,10 @@ export function VideoPlayer({
         <div className="video-topbar-actions">
           <div className="video-fit-toggle" role="group" aria-label="画面适配方式">
             <button type="button" aria-pressed={fitMode === 'contain'} onClick={() => setFitMode('contain')}>
-              原始比例
-            </button>
-            <button type="button" aria-pressed={fitMode === 'cover'} onClick={() => setFitMode('cover')}>
               铺满屏幕
+            </button>
+            <button type="button" aria-pressed={fitMode === 'native'} onClick={() => setFitMode('native')}>
+              原始尺寸
             </button>
           </div>
           {canSetFrameCover && (
@@ -305,7 +305,7 @@ export function VideoPlayer({
               <video
                 key={sourceUrl}
                 ref={videoRef}
-                className={`video-player ${fitMode === 'cover' ? 'fit-cover' : 'fit-contain'}`}
+                className={`video-player ${fitMode === 'native' ? 'fit-native' : 'fit-contain'}`}
                 autoPlay
                 playsInline
                 onClick={() => {

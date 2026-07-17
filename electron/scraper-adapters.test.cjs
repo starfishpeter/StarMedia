@@ -66,6 +66,26 @@ test('searches and previews Bangumi subjects through the injected network port',
   assert.equal(calls[0].options.headers.Authorization, 'Bearer header.eyJleHAiOjIwMDAwMDAwMDB9.signature')
 })
 
+test('routes Bangumi requests through its dedicated direct network port', async () => {
+  const calls = []
+  const adapters = createScraperAdapters({
+    loadConfig: async () => ({
+      scraping: { bangumiEndpoint: 'https://bangumi.example', bangumiToken: '', hanime1Endpoint: 'https://hanime1.example' },
+    }),
+    fetchWithNetwork: async () => {
+      throw new Error('proxy should not handle Bangumi')
+    },
+    fetchBangumi: async (url, options) => {
+      calls.push({ url, options })
+      return jsonResponse({ data: [] })
+    },
+  })
+
+  await adapters.searchBangumiSubjects({ query: 'Example' })
+  assert.equal(calls[0].url, 'https://bangumi.example/v0/search/subjects')
+  assert.equal(calls[0].options.method, 'POST')
+})
+
 test('caches FreeAnimeHentai data and ranks exact matches first', async () => {
   let calls = 0
   let time = 0

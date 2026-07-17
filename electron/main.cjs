@@ -150,10 +150,18 @@ const { loadConfig, saveConfig } = createConfigService({ getConfigPaths, default
 const bookCoverThumbnailService = createBookCoverThumbnailService({ nativeImage, writeFileAtomically })
 
 let networkProxyService = null
+let bangumiDirectProxyTask = null
 const fetchWithSystemNetwork = createSystemNetworkFetch({
   electronFetch: (url, options = {}) => net.fetch(url, { ...options, session: session.defaultSession }),
   isProxyEnabled: () => networkProxyService?.isEnabled() ?? false,
 })
+
+async function fetchBangumiDirect(url, options = {}) {
+  const bangumiSession = session.fromPartition('starmedia-bangumi-direct')
+  if (!bangumiDirectProxyTask) bangumiDirectProxyTask = bangumiSession.setProxy({ mode: 'direct' })
+  await bangumiDirectProxyTask
+  return net.fetch(url, { ...options, session: bangumiSession })
+}
 
 function getNetworkProxyService() {
   if (!networkProxyService) networkProxyService = createNetworkProxyService({ electronSession: session.defaultSession })
@@ -172,6 +180,7 @@ async function saveConfigWithNetworkProxy(config) {
 
 const scraperAdapters = createScraperAdapters({
   loadConfig,
+  fetchBangumi: fetchBangumiDirect,
   fetchWithNetwork: fetchWithSystemNetwork,
   appVersion: `StarMedia/${app.getVersion()}`,
   defaultHanime1Endpoint,
@@ -199,6 +208,7 @@ const localUpdateService = createLocalUpdateService({
   run7z,
   updaterScriptPath: path.join(__dirname, 'local-update-runner.ps1'),
   updaterLauncherPath: path.join(__dirname, 'local-update-launcher.cmd'),
+  updaterLauncherScriptPath: path.join(__dirname, 'local-update-launcher.vbs'),
 })
 
 const githubUpdateService = createGitHubUpdateService({
@@ -497,9 +507,36 @@ async function createImportPlan(input) {
 async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
   const { libraryPath, backupDir, coversDir } = getConfigPaths()
   const data = await loadLibraryFile(libraryPath)
+  const config = await loadConfig()
+  const availableLibraryRoots = new Map()
+  for (const libraryId of libraryIds) {
+    const rootPath = config.libraries[libraryId]?.rootPath ?? ''
+    if (!path.isAbsolute(rootPath)) {
+      availableLibraryRoots.set(libraryId, false)
+      continue
+    }
+    try {
+      availableLibraryRoots.set(libraryId, (await fs.stat(rootPath)).isDirectory())
+    } catch {
+      // Preserve records when an entire configured library root is temporarily unavailable, such as a disconnected drive.
+      availableLibraryRoots.set(libraryId, false)
+    }
+  }
+  const missingItemIds = new Set()
+  for (const item of data.items) {
+    const rootPath = config.libraries[item?.library]?.rootPath ?? ''
+    if (!availableLibraryRoots.get(item?.library) || !path.isAbsolute(item?.sourcePath) || !isPathInside(rootPath, item.sourcePath))
+      continue
+    try {
+      if (!(await fs.stat(item.sourcePath)).isFile()) missingItemIds.add(item.id)
+    } catch (error) {
+      if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') missingItemIds.add(item.id)
+    }
+  }
+  const indexedItems = data.items.filter((item) => !missingItemIds.has(item?.id))
   const generatedVideoCoverUrl = pathToFileURL(path.join(coversDir, 'videos')).toString()
-  let changed = false
-  const items = data.items.map((item) => {
+  let changed = missingItemIds.size > 0
+  const items = indexedItems.map((item) => {
     let next = item
     if (item?.kind === 'book' && item.cover && !getCurrentArchiveCoverPath(item)) next = { ...next, cover: '' }
     if (
@@ -552,8 +589,14 @@ async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
   })
   let normalized = data
   if (changed)
-    normalized = (await saveLibraryFile({ libraryPath, backupDir, data: { items, operations: data.operations }, backupExisting: false }))
-      .data
+    normalized = (
+      await saveLibraryFile({
+        libraryPath,
+        backupDir,
+        data: { items, operations: data.operations },
+        backupExisting: missingItemIds.size > 0,
+      })
+    ).data
   const repairTask = thumbnailService
     ? thumbnailService.scheduleMissingRepair(normalized, withFileOperationLock)
     : Promise.resolve(normalized)
@@ -622,6 +665,7 @@ const scraperApplicationService = createScraperApplicationService({
   loadConfig,
   loadLibrary,
   saveLibrary,
+  fetchBangumi: fetchBangumiDirect,
   fetchWithNetwork: fetchWithSystemNetwork,
   writeFileAtomically,
   appVersion: `StarMedia/${app.getVersion()}`,

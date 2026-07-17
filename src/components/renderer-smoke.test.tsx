@@ -151,8 +151,8 @@ describe('renderer component smoke coverage', () => {
     expect(markup).toContain('移入回收站')
     expect(markup).toContain('字幕：关闭')
     expect(markup).toContain('English')
-    expect(markup).toContain('原始比例')
     expect(markup).toContain('铺满屏幕')
+    expect(markup).toContain('原始尺寸')
   })
 
   it('caps the initial archive media wall DOM for large libraries', () => {

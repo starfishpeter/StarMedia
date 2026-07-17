@@ -14,6 +14,9 @@ function loadMainWithElectronMock(t) {
   const handlers = new Map()
   const windows = []
   const proxyConfigurations = []
+  const bangumiProxyConfigurations = []
+  const networkRequests = []
+  const bangumiSession = { setProxy: async (configuration) => bangumiProxyConfigurations.push(configuration) }
   class BrowserWindow {
     constructor(options) {
       this.options = options
@@ -94,8 +97,16 @@ function loadMainWithElectronMock(t) {
       showMessageBox: async () => ({}),
     },
     ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
-    net: { fetch: async () => new Response('') },
-    session: { defaultSession: { setProxy: async (configuration) => proxyConfigurations.push(configuration) } },
+    net: {
+      fetch: async (url, options) => {
+        networkRequests.push({ url, options })
+        return new Response(JSON.stringify({ data: [] }), { headers: { 'content-type': 'application/json' } })
+      },
+    },
+    session: {
+      defaultSession: { setProxy: async (configuration) => proxyConfigurations.push(configuration) },
+      fromPartition: () => bangumiSession,
+    },
     shell: { trashItem: async () => {}, openPath: async () => '', openExternal: async () => '' },
   }
   const mainPath = path.join(workspaceRoot, 'electron', 'main.cjs')
@@ -115,7 +126,7 @@ function loadMainWithElectronMock(t) {
     delete require.cache[mainPath]
     return fsPromises.rm(dataRoot, { recursive: true, force: true })
   })
-  return { dataRoot, handlers, main, proxyConfigurations, windows }
+  return { bangumiProxyConfigurations, bangumiSession, dataRoot, handlers, main, networkRequests, proxyConfigurations, windows }
 }
 
 test('registers every declared IPC handler and rejects untrusted senders before parsing requests', async (t) => {
@@ -174,6 +185,72 @@ test('uses legacy development data only when the current data root has no index'
       pathExists: () => false,
     }),
     path.join('D:', 'Portable', 'StarMediaData'),
+  )
+})
+
+test('routes Bangumi requests through the dedicated direct Electron session', async (t) => {
+  const { bangumiProxyConfigurations, bangumiSession, handlers, main, networkRequests, windows } = loadMainWithElectronMock(t)
+  main.createWindow()
+  main.registerIpc()
+  const event = { sender: windows[0].webContents, senderFrame: windows[0].webContents.mainFrame }
+
+  await handlers.get(IPC_CHANNELS.bangumiSearchSubjects)(event, { query: 'Example' })
+
+  assert.deepEqual(bangumiProxyConfigurations, [{ mode: 'direct' }])
+  assert.equal(networkRequests[0].options.session, bangumiSession)
+})
+
+test('removes records whose managed media files no longer exist when loading the library', async (t) => {
+  const { dataRoot, handlers, main, windows } = loadMainWithElectronMock(t)
+  main.createWindow()
+  main.registerIpc()
+  const event = { sender: windows[0].webContents, senderFrame: windows[0].webContents.mainFrame }
+  const config = await main.loadConfig()
+  const mediaRoot = path.join(os.tmpdir(), `starmedia-main-library-prune-${Date.now()}`)
+  const libraryRoot = path.join(mediaRoot, 'general')
+  const missingPath = path.join(libraryRoot, 'removed.zip')
+  t.after(() => fsPromises.rm(mediaRoot, { recursive: true, force: true }))
+  await fsPromises.mkdir(libraryRoot, { recursive: true })
+  config.mediaRoot = mediaRoot
+  config.libraries.general.rootPath = libraryRoot
+  await handlers.get(IPC_CHANNELS.configSave)(event, config)
+  await fsPromises.writeFile(
+    path.join(dataRoot, 'starmedia-library.json'),
+    `${JSON.stringify({
+      items: [{ id: 'book:removed', library: 'general', kind: 'book', title: 'Removed', sourcePath: missingPath }],
+      operations: [],
+    })}\n`,
+  )
+
+  const loaded = await handlers.get(IPC_CHANNELS.libraryLoad)(event)
+  assert.deepEqual(loaded.data.items, [])
+  assert.deepEqual(JSON.parse(await fsPromises.readFile(path.join(dataRoot, 'starmedia-library.json'), 'utf8')).items, [])
+})
+
+test('preserves records when their entire configured library root is unavailable', async (t) => {
+  const { dataRoot, handlers, main, windows } = loadMainWithElectronMock(t)
+  main.createWindow()
+  main.registerIpc()
+  const event = { sender: windows[0].webContents, senderFrame: windows[0].webContents.mainFrame }
+  const config = await main.loadConfig()
+  const unavailableRoot = path.join(os.tmpdir(), `starmedia-main-unavailable-library-${Date.now()}`)
+  const missingPath = path.join(unavailableRoot, 'removed.zip')
+  config.libraries.general.rootPath = unavailableRoot
+  await handlers.get(IPC_CHANNELS.configSave)(event, config)
+  await fsPromises.rm(unavailableRoot, { recursive: true, force: true })
+  await fsPromises.writeFile(
+    path.join(dataRoot, 'starmedia-library.json'),
+    `${JSON.stringify({ items: [{ id: 'book:offline', library: 'general', title: 'Offline', sourcePath: missingPath }], operations: [] })}\n`,
+  )
+
+  const loaded = await handlers.get(IPC_CHANNELS.libraryLoad)(event)
+  assert.deepEqual(
+    loaded.data.items.map((item) => item.id),
+    ['book:offline'],
+  )
+  assert.deepEqual(
+    JSON.parse(await fsPromises.readFile(path.join(dataRoot, 'starmedia-library.json'), 'utf8')).items.map((item) => item.id),
+    ['book:offline'],
   )
 })
 

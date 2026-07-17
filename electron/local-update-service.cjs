@@ -123,6 +123,7 @@ function createLocalUpdateService({
   run7z,
   updaterScriptPath,
   updaterLauncherPath,
+  updaterLauncherScriptPath,
   fileSystem = fs,
   temporaryDirectory = os.tmpdir,
   spawnUpdater = defaultSpawnUpdater,
@@ -130,7 +131,14 @@ function createLocalUpdateService({
   now = () => new Date(),
   minimumExecutableBytes = 20 * 1024 * 1024,
 }) {
-  if (typeof run7z !== 'function' || typeof spawnUpdater !== 'function' || typeof updaterLauncherPath !== 'string' || !updaterLauncherPath)
+  if (
+    typeof run7z !== 'function' ||
+    typeof spawnUpdater !== 'function' ||
+    typeof updaterLauncherPath !== 'string' ||
+    !updaterLauncherPath ||
+    typeof updaterLauncherScriptPath !== 'string' ||
+    !updaterLauncherScriptPath
+  )
     throw new Error('本地升级服务依赖不可用')
   const installDirectory = path.dirname(executablePath)
 
@@ -217,10 +225,12 @@ function createLocalUpdateService({
     const snapshotDirectory = await createPreUpdateSnapshot(prepared.targetVersion)
     const runnerPath = path.join(prepared.workDirectory, 'local-update-runner.ps1')
     const launcherPath = path.join(prepared.workDirectory, 'local-update-launcher.cmd')
+    const launcherScriptPath = path.join(prepared.workDirectory, 'local-update-launcher.vbs')
     const planPath = path.join(prepared.workDirectory, 'plan.json')
     const statusPath = path.join(prepared.workDirectory, 'status.txt')
     await fileSystem.copyFile(updaterScriptPath, runnerPath)
     await fileSystem.copyFile(updaterLauncherPath, launcherPath)
+    await fileSystem.copyFile(updaterLauncherScriptPath, launcherScriptPath)
     const token = randomUUID()
     const logPath = path.join(updatesDirectory, `update-${now().toISOString().replace(/[:.]/g, '-')}.log`)
     await fileSystem.writeFile(logPath, `${now().toISOString()} Starting update runner.\n`, 'utf8')

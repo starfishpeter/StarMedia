@@ -12,6 +12,7 @@ test('normalizes supported proxy addresses and applies direct or fixed proxy mod
 
   assert.equal(normalizeProxyUrl('127.0.0.1:8390'), 'http://127.0.0.1:8390')
   assert.equal(normalizeProxyUrl('socks5://127.0.0.1:8390'), 'socks5://127.0.0.1:8390')
+  assert.equal(normalizeProxyUrl('https://https://127.0.0.1:8390'), 'http://127.0.0.1:8390')
   assert.throws(() => normalizeProxyUrl('ftp://127.0.0.1:8390'), /仅支持/)
   assert.throws(() => normalizeProxyUrl('http://127.0.0.1:8390/path'), /格式无效/)
 

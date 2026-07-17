@@ -3048,6 +3048,7 @@ select:focus {
 .import-form {
   display: flex;
   flex-direction: column;
+  align-items: center;
   gap: 14px;
 }
 .import-form label {
@@ -3064,6 +3065,7 @@ select:focus {
   height: 36px;
 }
 .upload-dropzone {
+  width: 100%;
   min-height: min(400px, calc(100vh - 230px));
   display: flex;
   flex-direction: column;
@@ -3110,6 +3112,14 @@ select:focus {
   justify-content: center;
   gap: 8px;
   margin-top: 2px;
+}
+.import-form .collection-import-options {
+  width: min(100%, 260px);
+}
+.import-form .source-list,
+.import-form .import-plan-button,
+.import-form .inline-error {
+  width: min(100%, 720px);
 }
 .hidden-file-input {
   display: none;
@@ -3793,8 +3803,8 @@ select:focus {
 .video-player.fit-contain {
   object-fit: contain;
 }
-.video-player.fit-cover {
-  object-fit: cover;
+.video-player.fit-native {
+  object-fit: none;
 }
 .video-controls {
   position: absolute;

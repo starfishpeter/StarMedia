@@ -260,12 +260,14 @@ function toFreeAnimeHentaiSubject(subject) {
 function createScraperAdapters({
   loadConfig,
   fetchWithNetwork,
+  fetchBangumi = fetchWithNetwork,
   appVersion = 'StarMedia',
   defaultHanime1Endpoint = 'https://hanime1.com',
   freeAnimeHentaiSearchEndpoint = 'https://guest.freeanimehentai.net/api/v11/search_hvs',
   now = () => Date.now(),
 }) {
-  if (typeof loadConfig !== 'function' || typeof fetchWithNetwork !== 'function') throw new Error('刮削服务依赖不可用')
+  if (typeof loadConfig !== 'function' || typeof fetchWithNetwork !== 'function' || typeof fetchBangumi !== 'function')
+    throw new Error('刮削服务依赖不可用')
   let hanimeSearchCache = { expiresAt: 0, subjects: [] }
 
   function getBangumiApiRoot(config) {
@@ -287,7 +289,7 @@ function createScraperAdapters({
   async function requestBangumi(config, endpoint, options = {}) {
     let response
     try {
-      response = await fetchWithNetwork(`${getBangumiApiRoot(config)}${endpoint}`, options)
+      response = await fetchBangumi(`${getBangumiApiRoot(config)}${endpoint}`, options)
     } catch (error) {
       throw new Error(`无法连接 Bangumi：${error.message}`, { cause: error })
     }

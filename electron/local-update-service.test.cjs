@@ -25,16 +25,13 @@ async function createSandbox(t) {
   const dataRoot = path.join(installDirectory, 'StarMediaData')
   const archivePath = path.join(root, 'StarMedia-update.zip')
   const updaterScriptPath = path.join(root, 'runner.ps1')
-  const updaterLauncherPath = path.join(root, 'launcher.cmd')
+  const updaterLauncherPath = path.join(__dirname, 'local-update-launcher.cmd')
+  const updaterLauncherScriptPath = path.join(__dirname, 'local-update-launcher.vbs')
   await fs.mkdir(dataRoot, { recursive: true })
   await fs.writeFile(archivePath, 'zip placeholder')
   await fs.writeFile(updaterScriptPath, 'param([string]$PlanPath)')
-  await fs.writeFile(
-    updaterLauncherPath,
-    '@echo off\nstart "" /b powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~1" -PlanPath "%~2" -StatusPath "%~3" >nul 2>nul\n',
-  )
   t.after(() => fs.rm(root, { recursive: true, force: true }))
-  return { root, installDirectory, dataRoot, archivePath, updaterLauncherPath, updaterScriptPath }
+  return { root, installDirectory, dataRoot, archivePath, updaterLauncherPath, updaterLauncherScriptPath, updaterScriptPath }
 }
 
 function createRun7zStub(version, entries) {
@@ -128,6 +125,7 @@ test('Windows command launcher starts the updater and completes its ready handsh
     dataRoot: sandbox.dataRoot,
     run7z: createRun7zStub('0.6.21', validEntries),
     updaterLauncherPath: sandbox.updaterLauncherPath,
+    updaterLauncherScriptPath: sandbox.updaterLauncherScriptPath,
     updaterScriptPath: sandbox.updaterScriptPath,
     temporaryDirectory: () => sandbox.root,
     minimumExecutableBytes: 1,
@@ -149,6 +147,7 @@ test('prepares a validated same-version package for reinstall and rejects downgr
       dataRoot: sandbox.dataRoot,
       run7z: createRun7zStub(version, validEntries),
       updaterLauncherPath: sandbox.updaterLauncherPath,
+      updaterLauncherScriptPath: sandbox.updaterLauncherScriptPath,
       updaterScriptPath: sandbox.updaterScriptPath,
       temporaryDirectory: () => sandbox.root,
       minimumExecutableBytes: 1,
@@ -175,6 +174,7 @@ test('creates a pre-update data snapshot and launches the detached runner with a
     dataRoot: sandbox.dataRoot,
     run7z: createRun7zStub('0.6.21', validEntries),
     updaterLauncherPath: sandbox.updaterLauncherPath,
+    updaterLauncherScriptPath: sandbox.updaterLauncherScriptPath,
     updaterScriptPath: sandbox.updaterScriptPath,
     temporaryDirectory: () => sandbox.root,
     minimumExecutableBytes: 1,
@@ -213,6 +213,7 @@ test('refuses to launch when the active data root is not the protected sibling d
     dataRoot: externalDataRoot,
     run7z: createRun7zStub('0.6.21', validEntries),
     updaterLauncherPath: sandbox.updaterLauncherPath,
+    updaterLauncherScriptPath: sandbox.updaterLauncherScriptPath,
     updaterScriptPath: sandbox.updaterScriptPath,
     temporaryDirectory: () => sandbox.root,
     minimumExecutableBytes: 1,

@@ -72,6 +72,7 @@ function createScraperApplicationService({
   loadLibrary,
   saveLibrary,
   fetchWithNetwork,
+  fetchBangumi = fetchWithNetwork,
   writeFileAtomically,
   appVersion,
   openExternal,
@@ -85,16 +86,17 @@ function createScraperApplicationService({
     typeof loadLibrary !== 'function' ||
     typeof saveLibrary !== 'function' ||
     typeof fetchWithNetwork !== 'function' ||
+    typeof fetchBangumi !== 'function' ||
     typeof writeFileAtomically !== 'function' ||
     typeof openExternal !== 'function'
   )
     throw new Error('刮削应用服务依赖不可用')
 
-  async function downloadPoster({ imageUrl, prefix, label, subjectId, referer = '' }) {
+  async function downloadPoster({ imageUrl, prefix, label, subjectId, referer = '', fetchWith = fetchWithNetwork }) {
     if (!imageUrl) return ''
     let response
     try {
-      response = await fetchWithNetwork(imageUrl, {
+      response = await fetchWith(imageUrl, {
         headers: { 'User-Agent': `${appVersion} (desktop media library)`, ...(referer ? { Referer: referer } : {}) },
       })
     } catch (error) {
@@ -127,7 +129,13 @@ function createScraperApplicationService({
       fields.affiliation || fields.originalTitle || fields.studio || fields.firstAiredAt || fields.releaseDate || fields.note,
     )
     const cover = fields.cover
-      ? await downloadPoster({ imageUrl: getBangumiImageUrl(subject), prefix: 'bangumi', label: 'Bangumi', subjectId })
+      ? await downloadPoster({
+          imageUrl: getBangumiImageUrl(subject),
+          prefix: 'bangumi',
+          label: 'Bangumi',
+          subjectId,
+          fetchWith: fetchBangumi,
+        })
       : ''
     const affiliation = getItemAffiliation(selected)
     const chineseTitle = fields.affiliation ? normalizeScrapedFolderName(fields.affiliation, affiliation) : ''

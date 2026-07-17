@@ -6,7 +6,9 @@ function describeNetworkError(error) {
 }
 
 function normalizeProxyUrl(value) {
-  const source = String(value ?? '').trim()
+  const source = String(value ?? '')
+    .trim()
+    .replace(/^(?:https?:\/\/)+/i, 'http://')
   if (!source) throw new Error('代理地址不能为空')
 
   let url

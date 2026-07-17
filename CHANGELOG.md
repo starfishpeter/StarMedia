@@ -2,6 +2,19 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.28] - 2026-07-17
+
+### 改进
+
+- 代理地址输入禁用浏览器自动补全；Bangumi 数据和封面请求固定走独立直连会话，GitHub 更新及其它在线刮削仍可使用应用代理。
+- 视频播放器将“铺满屏幕”调整为保持比例并最大化显示，新增“原始尺寸”以实际分辨率居中显示。
+- 资源导入页移除扫描说明并统一居中布局。
+
+### 修复
+
+- 启动时自动移除受管理媒体库根目录中已不存在的主媒体文件记录，并保留索引备份；根目录整体不可用时不会删除记录。
+- 更新器改为无窗口启动 PowerShell，避免升级后的应用依附于终端窗口。
+
 ## [0.6.27] - 2026-07-17
 
 ### 修复
@@ -86,3 +99,4 @@
 [0.6.24]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.24
 [0.6.25]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.25
 [0.6.27]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.27
+[0.6.28]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.28
