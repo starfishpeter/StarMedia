@@ -65,12 +65,12 @@ const fallbackConfig: StarMediaConfig = {
     hanime1Endpoint: 'https://hanime1.com',
   },
   libraries: {
-    erAnime: { rootPath: '', enabled: true },
-    anime: { rootPath: '', enabled: true },
-    creator: { rootPath: '', enabled: true },
-    books: { rootPath: '', enabled: true },
-    comics: { rootPath: '', enabled: true },
-    general: { rootPath: '', enabled: true },
+    erAnime: { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    anime: { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    creator: { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    books: { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    comics: { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    general: { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
   },
   catalog: {
     tags: [],
@@ -146,7 +146,13 @@ function App() {
   const playerRequestRef = useRef(0)
 
   const activeLibrary = isLibraryNavigation(activeNavigation) ? libraryById[activeNavigation] : null
-  const browseState = activeLibrary ? libraryBrowseStates[activeLibrary.id] : searchBrowseState
+  const browseState = activeLibrary
+    ? {
+        ...libraryBrowseStates[activeLibrary.id],
+        sortMode: config.libraries[activeLibrary.id].sortMode,
+        sortDirection: config.libraries[activeLibrary.id].sortDirection,
+      }
+    : searchBrowseState
   const { primaryFilter, tagFilter, sortMode, sortDirection } = browseState
   const sortOptions = getSortOptions(activeLibrary?.id ?? null)
   const updateBrowseState = (changes: Partial<LibraryBrowseState>) => {
@@ -154,10 +160,24 @@ function App() {
       setSearchBrowseState((current) => ({ ...current, ...changes }))
       return
     }
-    setLibraryBrowseStates((current) => ({
-      ...current,
-      [activeLibrary.id]: { ...current[activeLibrary.id], ...changes },
-    }))
+    const { sortMode: nextSortMode, sortDirection: nextSortDirection, ...filterChanges } = changes
+    if (Object.keys(filterChanges).length > 0)
+      setLibraryBrowseStates((current) => ({
+        ...current,
+        [activeLibrary.id]: { ...current[activeLibrary.id], ...filterChanges },
+      }))
+    if (nextSortMode || nextSortDirection)
+      setConfig((current) => ({
+        ...current,
+        libraries: {
+          ...current.libraries,
+          [activeLibrary.id]: {
+            ...current.libraries[activeLibrary.id],
+            ...(nextSortMode ? { sortMode: nextSortMode } : {}),
+            ...(nextSortDirection ? { sortDirection: nextSortDirection } : {}),
+          },
+        },
+      }))
   }
   const resetBrowseFilters = () => updateBrowseState({ primaryFilter: 'all', tagFilter: 'all' })
   const apiAvailable = Boolean(
@@ -169,6 +189,7 @@ function App() {
   const settingsCapabilities = {
     chooseDirectory: Boolean(window.starMedia?.chooseDirectory),
     clearCaches: Boolean(window.starMedia?.clearCaches),
+    clearInvalidRecords: Boolean(window.starMedia?.getLibrary),
     clearEmptyMediaDirectories: Boolean(window.starMedia?.clearEmptyMediaDirectories),
     clearImportedRecords: Boolean(window.starMedia?.clearImportedRecords),
     exportAppData: Boolean(window.starMedia?.exportAppData),
@@ -1134,6 +1155,35 @@ function App() {
     }
   }
 
+  async function clearInvalidRecords() {
+    if (!window.starMedia?.getLibrary) return
+    if (!(await flushConfigSave())) {
+      notify('路径配置尚未保存，已取消清理。')
+      return
+    }
+    if (
+      !window.confirm(
+        '会清理当前可访问的受管理媒体库中主文件已不存在的记录。媒体库根目录不可访问时会保留记录，不会删除任何实际文件。是否继续？',
+      )
+    )
+      return
+    try {
+      const previousIds = new Set(libraryItems.map((item) => item.id))
+      const result = await window.starMedia.getLibrary()
+      const currentIds = new Set(result.data.items.map((item) => item.id))
+      const removedCount = [...previousIds].filter((id) => !currentIds.has(id)).length
+      setLibraryItems(result.data.items)
+      setSelectedMediaIds((current) => current.filter((id) => currentIds.has(id)))
+      setSelectedItem((current) => (current && currentIds.has(current.id) ? current : null))
+      if (readerItem && !currentIds.has(readerItem.id)) closeBookReader()
+      if (playerItem && !currentIds.has(playerItem.id)) closeVideoPlayer()
+      notify(removedCount > 0 ? `已清理 ${removedCount} 条失效记录。` : '没有发现需要清理的失效记录。')
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `清理失效记录失败：${error.message}` : '清理失效记录失败。')
+    }
+  }
+
   async function updateContainerNote(item: MediaItem, note: string) {
     if (!window.starMedia?.updateContainerInfo) return
     try {
@@ -1411,6 +1461,7 @@ function App() {
             onMediaRootChange={updateMediaRoot}
             onClearImportedRecords={clearImportedRecords}
             onClearEmptyMediaDirectories={clearEmptyMediaDirectories}
+            onClearInvalidRecords={clearInvalidRecords}
             onExportAppData={exportAppData}
             exportingAppData={exportingAppData}
             onImportAppData={importAppData}

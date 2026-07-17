@@ -39,7 +39,13 @@ test('creates stable defaults for every known library without persisting on load
   assert.deepEqual(config.network, { proxyEnabled: false, proxyUrl: '' })
   assert.deepEqual(Object.keys(config.libraries), libraryIds)
   assert.equal(
-    libraryIds.every((id) => config.libraries[id].rootPath === '' && config.libraries[id].enabled),
+    libraryIds.every(
+      (id) =>
+        config.libraries[id].rootPath === '' &&
+        config.libraries[id].enabled &&
+        config.libraries[id].sortMode === 'title' &&
+        config.libraries[id].sortDirection === 'ascending',
+    ),
     true,
   )
   await assert.rejects(fs.access(paths.configPath), { code: 'ENOENT' })
@@ -62,6 +68,11 @@ test('sanitizes configuration values and migrates legacy classifications', async
       studios: [' Studio ', 'Studio'],
       creators: [' Creator ', 'Creator'],
     },
+    libraries: {
+      anime: { rootPath: ' C:\\Anime ', enabled: false, sortMode: 'firstAired', sortDirection: 'descending' },
+      books: { sortMode: 'releaseDate', sortDirection: 'ascending' },
+      general: { sortMode: 'firstAired', sortDirection: 'sideways' },
+    },
   })
 
   assert.equal(config.mediaRoot, 'C:\\Media')
@@ -75,6 +86,14 @@ test('sanitizes configuration values and migrates legacy classifications', async
   assert.deepEqual(config.catalog.studios, ['Studio'])
   assert.deepEqual(config.catalog.creators, ['Creator'])
   assert.deepEqual(config.catalog.classifications, [{ id: 'legacy-1', name: '番剧', tags: [], libraryIds: ['anime', 'books'] }])
+  assert.deepEqual(config.libraries.anime, {
+    rootPath: 'C:\\Anime',
+    enabled: false,
+    sortMode: 'firstAired',
+    sortDirection: 'descending',
+  })
+  assert.equal(config.libraries.books.sortMode, 'releaseDate')
+  assert.deepEqual(config.libraries.general, { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' })
 })
 
 test('saves an absolute media root, creates default library roots, and backs up previous config bytes', async (t) => {
@@ -96,6 +115,8 @@ test('saves an absolute media root, creates default library roots, and backs up 
   assert.equal((await fs.stat(path.join(paths.dataRoot, 'custom-anime'))).isDirectory(), true)
   assert.equal(result.config.libraries.anime.enabled, false)
   assert.equal(result.config.libraries.anime.rootPath, path.join(paths.dataRoot, 'custom-anime'))
+  assert.equal(result.config.libraries.anime.sortMode, 'title')
+  assert.equal(result.config.libraries.anime.sortDirection, 'ascending')
   assert.equal(backupNames.length, 1)
   assert.equal(await fs.readFile(path.join(paths.backupDir, backupNames[0]), 'utf8'), previousContents)
   assert.equal((await fs.readFile(paths.configPath, 'utf8')).endsWith('\n'), true)

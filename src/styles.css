@@ -2073,17 +2073,19 @@ select:focus {
 }
 .detail-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 13px 10px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 0;
   margin: 0;
   padding: 15px 0;
   border-top: 1px solid var(--line);
   border-bottom: 1px solid var(--line);
 }
 .detail-grid div {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  gap: 16px;
+  align-items: baseline;
+  padding: 7px 0;
 }
 .detail-grid dt {
   color: var(--muted);
@@ -2093,9 +2095,12 @@ select:focus {
   letter-spacing: 0.04em;
 }
 .detail-grid dd {
+  min-width: 0;
   margin: 0;
   color: var(--text);
   font-size: 13px;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 .detail-category-select {
   max-width: 100%;
@@ -3727,6 +3732,7 @@ select:focus {
   object-fit: none;
 }
 .video-player::cue {
+  background-color: transparent;
   color: #fff;
   font-family: 'Microsoft YaHei', sans-serif;
   font-size: 22px;

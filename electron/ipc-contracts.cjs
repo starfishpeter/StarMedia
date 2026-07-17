@@ -1,5 +1,5 @@
 const path = require('node:path')
-const { libraryIds } = require('./library-definitions.cjs')
+const { libraryIds, librarySortModes } = require('./library-definitions.cjs')
 const { normalizeProxyUrl } = require('./system-network-service.cjs')
 
 const MAX_ID_LENGTH = 4096
@@ -173,10 +173,12 @@ function parseConfig(value) {
 
   const libraries = object(config.libraries, '媒体库配置', libraryIds)
   for (const libraryId of libraryIds) {
-    const library = object(libraries[libraryId], `${libraryId} 媒体库配置`, ['rootPath', 'enabled'])
+    const library = object(libraries[libraryId], `${libraryId} 媒体库配置`, ['rootPath', 'enabled', 'sortMode', 'sortDirection'])
     const rootPath = string(library.rootPath, `${libraryId} 根目录`, { max: MAX_PATH_LENGTH, trim: true })
     if (rootPath && !path.isAbsolute(rootPath)) fail(`${libraryId} 根目录必须是绝对路径`)
     if (typeof library.enabled !== 'boolean') fail(`${libraryId} 启用状态无效`)
+    if (!librarySortModes[libraryId].includes(library.sortMode)) fail(`${libraryId} 排序方式无效`)
+    if (!['ascending', 'descending'].includes(library.sortDirection)) fail(`${libraryId} 排序方向无效`)
   }
 
   const catalog = object(config.catalog, '词汇配置', ['tags', 'classifications', 'studios', 'creators'])

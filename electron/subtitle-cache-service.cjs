@@ -3,6 +3,8 @@ const { createHash } = require('node:crypto')
 const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 
+const subtitleCacheVersion = '2'
+
 function convertAssTimeToVtt(value) {
   const match = /^(\d+):(\d{2}):(\d{2})[.,](\d{1,3})$/.exec(String(value).trim())
   if (!match) return ''
@@ -50,6 +52,18 @@ function assClassName(name) {
   return `ass-${normalized || 'default'}`
 }
 
+function createOutlineShadows(width, color) {
+  const distance = Math.max(0, Number(width) || 0)
+  if (distance === 0) return []
+  const steps = Math.max(16, Math.ceil(distance * Math.PI * 2))
+  return Array.from({ length: steps }, (_, index) => {
+    const angle = (Math.PI * 2 * index) / steps
+    const x = Math.round(Math.cos(angle) * distance * 100) / 100
+    const y = Math.round(Math.sin(angle) * distance * 100) / 100
+    return `${x}px ${y}px 0 ${color}`
+  })
+}
+
 function parseAssStyles(content) {
   const styles = new Map()
   let inStyleSection = false
@@ -84,16 +98,11 @@ function parseAssStyles(content) {
     const outline = Math.max(0, Math.min(8, Number(source.outline) || 0))
     const shadow = Math.max(0, Math.min(8, Number(source.shadow) || 0))
     const shadows = []
-    if (outline > 0)
-      shadows.push(
-        `${-outline}px 0 ${outlineColor}`,
-        `${outline}px 0 ${outlineColor}`,
-        `0 ${-outline}px ${outlineColor}`,
-        `0 ${outline}px ${outlineColor}`,
-      )
+    if (outline > 0) shadows.push(...createOutlineShadows(outline, outlineColor))
     if (shadow > 0) shadows.push(`${shadow}px ${shadow}px ${shadowColor}`)
     const rules = [
       `color:${primaryColor}`,
+      'background-color:transparent',
       `font-family:"${String(source.fontname ?? 'sans-serif').replace(/["\\{};]/g, '')}"`,
       `font-size:${fontSize}px`,
     ]
@@ -158,7 +167,10 @@ async function createSubtitlePlaybackTracks({
       const subtitleCacheDir = path.join(cacheDir, 'subtitles')
       await fileSystem.mkdir(subtitleCacheDir, { recursive: true })
       const sourceKey = typeof subtitle.path === 'string' ? subtitle.path : `embedded:${subtitle.label}`
-      const cachePath = path.join(subtitleCacheDir, `${createHash('sha1').update(`${sourceKey}:${content}`).digest('hex')}.vtt`)
+      const cachePath = path.join(
+        subtitleCacheDir,
+        `${createHash('sha1').update(`${subtitleCacheVersion}:${sourceKey}:${content}`).digest('hex')}.vtt`,
+      )
       try {
         await fileSystem.access(cachePath)
       } catch (error) {

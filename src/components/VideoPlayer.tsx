@@ -269,7 +269,7 @@ export function VideoPlayer({
         <div className="video-topbar-actions">
           <div className="video-fit-toggle" role="group" aria-label="画面适配方式">
             <button type="button" aria-pressed={fitMode === 'contain'} onClick={() => setFitMode('contain')}>
-              铺满屏幕
+              适应窗口
             </button>
             <button type="button" aria-pressed={fitMode === 'native'} onClick={() => setFitMode('native')}>
               原始尺寸

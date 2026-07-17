@@ -153,8 +153,18 @@ test('registers every declared IPC handler and rejects untrusted senders before 
   assert.equal(window.closed, false)
   const config = await handlers.get(IPC_CHANNELS.configLoad)(event)
   config.config.confirmBeforeClose = false
+  config.config.libraries.anime.sortMode = 'firstAired'
+  config.config.libraries.anime.sortDirection = 'descending'
   await handlers.get(IPC_CHANNELS.configSave)(event, config.config)
   assert.deepEqual(proxyConfigurations.at(-1), { mode: 'direct' })
+  const persistedConfig = await handlers.get(IPC_CHANNELS.configLoad)(event)
+  assert.deepEqual(persistedConfig.config.libraries.anime, {
+    ...config.config.libraries.anime,
+    sortMode: 'firstAired',
+    sortDirection: 'descending',
+  })
+  persistedConfig.config.libraries.general.sortMode = 'firstAired'
+  await assert.rejects(handlers.get(IPC_CHANNELS.configSave)(event, persistedConfig.config), /general 排序方式无效/)
   config.config.network = { proxyEnabled: true, proxyUrl: 'http://127.0.0.1:8390' }
   await handlers.get(IPC_CHANNELS.configSave)(event, config.config)
   assert.deepEqual(proxyConfigurations.at(-1), { mode: 'fixed_servers', proxyRules: 'http=127.0.0.1:8390;https=127.0.0.1:8390' })

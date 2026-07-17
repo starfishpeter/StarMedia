@@ -2,6 +2,19 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.30] - 2026-07-18
+
+### 修复
+
+- ASS 外置字幕转换为 WebVTT 时显式清除 Chromium 默认半透明背景，并以连续描边近似原始 ASS 描边，改善粗描边字幕的锯齿问题。
+- 详情抽屉将视频格式与时长拆分显示，时长尚未读取时不再错误显示文件格式。
+
+### 改进
+
+- 路径配置页新增“清理失效记录”，复用启动时的安全清理规则：仅移除当前可访问媒体库中主文件已不存在的索引，并自动保留索引备份。
+- 媒体库排序方式与方向按媒体库持久化到本地配置，重启后保持上次选择。
+- 路径设置更名为“路径配置”，详情元数据改为一项一行，播放器“铺满屏幕”更名为“适应窗口”。
+
 ## [0.6.29] - 2026-07-17
 
 ### 改进
@@ -113,3 +126,4 @@
 [0.6.27]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.27
 [0.6.28]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.28
 [0.6.29]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.29
+[0.6.30]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.30

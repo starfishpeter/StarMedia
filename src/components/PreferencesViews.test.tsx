@@ -12,12 +12,12 @@ const config: StarMediaConfig = {
   network: { proxyEnabled: false, proxyUrl: '' },
   scraping: { bangumiToken: '', bangumiEndpoint: 'https://api.bgm.tv', hanime1Endpoint: 'https://hanime1.com' },
   libraries: {
-    erAnime: { rootPath: 'C:\\Media\\里番', enabled: true },
-    anime: { rootPath: 'C:\\Media\\番剧', enabled: true },
-    creator: { rootPath: 'C:\\Media\\原创', enabled: true },
-    books: { rootPath: 'C:\\Media\\本子', enabled: true },
-    comics: { rootPath: 'C:\\Media\\漫画', enabled: true },
-    general: { rootPath: 'C:\\Media\\综合', enabled: true },
+    erAnime: { rootPath: 'C:\\Media\\里番', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    anime: { rootPath: 'C:\\Media\\番剧', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    creator: { rootPath: 'C:\\Media\\原创', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    books: { rootPath: 'C:\\Media\\本子', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    comics: { rootPath: 'C:\\Media\\漫画', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+    general: { rootPath: 'C:\\Media\\综合', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
   },
   catalog: { tags: [], classifications: [], studios: [], creators: [] },
 }
@@ -32,6 +32,7 @@ describe('SettingsView', () => {
         capabilities={{
           chooseDirectory: true,
           clearCaches: true,
+          clearInvalidRecords: true,
           clearEmptyMediaDirectories: true,
           clearImportedRecords: true,
           exportAppData: true,
@@ -48,6 +49,7 @@ describe('SettingsView', () => {
         onMediaRootChange={() => {}}
         onClearImportedRecords={() => {}}
         onClearEmptyMediaDirectories={() => {}}
+        onClearInvalidRecords={() => {}}
         onExportAppData={() => {}}
         exportingAppData={false}
         onImportAppData={() => {}}
@@ -71,6 +73,7 @@ describe('SettingsView', () => {
     expect(markup).toContain('C:\\StarMediaData')
     expect(markup).toContain('0.6.21')
     expect(markup).toContain('选择本地升级包')
+    expect(markup).toContain('路径配置')
     expect(markup).toContain('网络代理')
   })
 
@@ -83,6 +86,7 @@ describe('SettingsView', () => {
         capabilities={{
           chooseDirectory: false,
           clearCaches: false,
+          clearInvalidRecords: false,
           clearEmptyMediaDirectories: false,
           clearImportedRecords: false,
           exportAppData: false,
@@ -99,6 +103,7 @@ describe('SettingsView', () => {
         onMediaRootChange={() => {}}
         onClearImportedRecords={() => {}}
         onClearEmptyMediaDirectories={() => {}}
+        onClearInvalidRecords={() => {}}
         onExportAppData={() => {}}
         exportingAppData={false}
         onImportAppData={() => {}}

@@ -6,6 +6,11 @@ import { TagEditor } from './TagEditor'
 
 type VideoPlaybackAvailability = 'checking' | 'supported' | 'unsupported'
 
+function getVideoFormat(item: MediaItem) {
+  const extension = item.sourcePath?.match(/\.([^.\\/]+)$/)?.[1]
+  return extension ? extension.toUpperCase() : '未设置'
+}
+
 export function DetailPanel({
   item,
   availableTags,
@@ -288,10 +293,23 @@ export function DetailPanel({
                 </div>
               </>
             )}
-            <div>
-              <dt>{isBook ? '页数' : '时长'}</dt>
-              <dd>{item.duration}</dd>
-            </div>
+            {isBook ? (
+              <div>
+                <dt>页数</dt>
+                <dd>{item.duration}</dd>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <dt>格式</dt>
+                  <dd>{getVideoFormat(item)}</dd>
+                </div>
+                <div>
+                  <dt>时长</dt>
+                  <dd>{item.durationSeconds ? item.duration : '未获取'}</dd>
+                </div>
+              </>
+            )}
             <div>
               <dt>{isBook ? '发行日期' : '单集日期'}</dt>
               <dd>{isBook ? item.releaseDate || item.firstAiredAt || '未设置' : item.releaseDate || '未设置'}</dd>

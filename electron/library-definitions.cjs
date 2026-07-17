@@ -1,4 +1,12 @@
 const libraryIds = Object.freeze(['erAnime', 'anime', 'creator', 'books', 'comics', 'general'])
+const librarySortModes = Object.freeze({
+  erAnime: Object.freeze(['title', 'firstAired']),
+  anime: Object.freeze(['title', 'firstAired']),
+  creator: Object.freeze(['title', 'releaseDate']),
+  books: Object.freeze(['title', 'releaseDate']),
+  comics: Object.freeze(['title', 'releaseDate']),
+  general: Object.freeze(['title']),
+})
 
 const defaultLibraryFolderNames = Object.freeze({
   erAnime: '里番',
@@ -36,4 +44,5 @@ module.exports = {
   isPosterLibrary,
   isVideoLibrary,
   libraryIds,
+  librarySortModes,
 }

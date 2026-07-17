@@ -31,6 +31,8 @@ test('preserves common ASS style attributes in generated WebVTT style rules', ()
   assert.match(vtt, /font-weight:700/)
   assert.match(vtt, /font-style:italic/)
   assert.match(vtt, /text-decoration:underline/)
+  assert.match(vtt, /background-color:transparent/)
+  assert.match(vtt, /text-shadow:[^;]*1\.85px 0\.77px 0 rgba\(0, 0, 0, 1\)/)
   assert.match(vtt, /<c.ass-main>Styled line<\/c>/)
 })
 

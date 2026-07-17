@@ -1,6 +1,6 @@
 const fs = require('node:fs/promises')
 const path = require('node:path')
-const { defaultLibraryFolderNames, libraryIds } = require('./library-definitions.cjs')
+const { defaultLibraryFolderNames, libraryIds, librarySortModes } = require('./library-definitions.cjs')
 const { writeFileAtomically } = require('./library-store.cjs')
 const { normalizeProxyUrl } = require('./system-network-service.cjs')
 
@@ -24,7 +24,9 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
         bangumiEndpoint: 'https://api.bgm.tv',
         hanime1Endpoint: defaultHanime1Endpoint,
       },
-      libraries: Object.fromEntries(libraryIds.map((id) => [id, { rootPath: '', enabled: true }])),
+      libraries: Object.fromEntries(
+        libraryIds.map((id) => [id, { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' }]),
+      ),
       catalog: {
         tags: [],
         classifications: [],
@@ -112,6 +114,10 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       libraries[id] = {
         rootPath: typeof library.rootPath === 'string' ? library.rootPath.trim() : '',
         enabled: typeof library.enabled === 'boolean' ? library.enabled : true,
+        sortMode: librarySortModes[id].includes(library.sortMode) ? library.sortMode : defaults.libraries[id].sortMode,
+        sortDirection: ['ascending', 'descending'].includes(library.sortDirection)
+          ? library.sortDirection
+          : defaults.libraries[id].sortDirection,
       }
     }
 

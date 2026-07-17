@@ -20,6 +20,7 @@ const configDateLabel = new Intl.DateTimeFormat('zh-CN', { dateStyle: 'medium', 
 export type SettingsCapabilities = {
   chooseDirectory: boolean
   clearCaches: boolean
+  clearInvalidRecords: boolean
   clearEmptyMediaDirectories: boolean
   clearImportedRecords: boolean
   exportAppData: boolean
@@ -51,6 +52,7 @@ export function SettingsView({
   onMediaRootChange,
   onClearImportedRecords,
   onClearEmptyMediaDirectories,
+  onClearInvalidRecords,
   onExportAppData,
   exportingAppData,
   onImportAppData,
@@ -77,6 +79,7 @@ export function SettingsView({
   onMediaRootChange: (mediaRoot: string) => void
   onClearImportedRecords: () => void
   onClearEmptyMediaDirectories: () => void
+  onClearInvalidRecords: () => void
   onExportAppData: () => void
   exportingAppData: boolean
   onImportAppData: () => void
@@ -144,7 +147,7 @@ export function SettingsView({
           </button>
           <button className={tab === 'paths' ? 'active' : ''} onClick={() => setTab('paths')}>
             <HardDrive size={16} />
-            <span>本地资源路径</span>
+            <span>路径配置</span>
           </button>
           <button className={tab === 'network' ? 'active' : ''} onClick={() => setTab('network')}>
             <Network size={16} />
@@ -371,6 +374,9 @@ export function SettingsView({
                     disabled={!capabilities.clearEmptyMediaDirectories || !config.mediaRoot.trim()}
                   >
                     清理其他空文件夹
+                  </button>
+                  <button className="secondary-button" onClick={onClearInvalidRecords} disabled={!capabilities.clearInvalidRecords}>
+                    清理失效记录
                   </button>
                 </div>
               </article>

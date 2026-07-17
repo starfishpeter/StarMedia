@@ -2,6 +2,8 @@
 
 type StarMediaConfigLibraryId = 'erAnime' | 'anime' | 'creator' | 'books' | 'comics' | 'general'
 type StarMediaTheme = 'dark' | 'light' | 'blue'
+type StarMediaSortMode = 'title' | 'releaseDate' | 'firstAired'
+type StarMediaSortDirection = 'ascending' | 'descending'
 
 interface StarMediaClassification {
   id: string
@@ -20,6 +22,8 @@ interface StarMediaCatalog {
 interface StarMediaLibraryConfig {
   rootPath: string
   enabled: boolean
+  sortMode: StarMediaSortMode
+  sortDirection: StarMediaSortDirection
 }
 
 interface StarMediaConfig {

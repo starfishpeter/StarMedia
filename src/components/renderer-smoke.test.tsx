@@ -21,6 +21,7 @@ const video: MediaItem = {
   tags: ['动作'],
   addedAt: '2026-01-01',
   duration: '24:00',
+  durationSeconds: 1440,
   kind: 'video',
   cover: '',
   note: 'Video note',
@@ -152,7 +153,11 @@ describe('renderer component smoke coverage', () => {
     expect(markup).toContain('移入回收站')
     expect(markup).toContain('字幕：关闭')
     expect(markup).toContain('English')
-    expect(markup).toContain('铺满屏幕')
+    expect(markup).toContain('格式')
+    expect(markup).toContain('MP4')
+    expect(markup).toContain('时长')
+    expect(markup).toContain('24:00')
+    expect(markup).toContain('适应窗口')
     expect(markup).toContain('原始尺寸')
   })
 
