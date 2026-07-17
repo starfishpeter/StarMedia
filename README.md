@@ -25,7 +25,7 @@ StarMedia 是一款面向 Windows 的本地优先媒体库，用一个桌面应�
 
 ## 从源码运行
 
-环境要求：Windows 10/11、Node.js 22 或更高版本、npm。
+环境要求：Windows 10/11、Node.js 24 或更高版本、npm。
 
 ```powershell
 git clone https://github.com/starfishpeter/StarMedia.git
