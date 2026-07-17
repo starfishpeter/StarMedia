@@ -5,6 +5,7 @@ const { randomUUID } = require('node:crypto')
 const { spawn } = require('node:child_process')
 
 const updateDirectoryPrefix = 'StarMedia-local-update-'
+const updaterReadyTimeoutMs = 60 * 1000
 const requiredPackagePaths = [
   'StarMedia.exe',
   path.join('resources', 'app', 'package.json'),
@@ -82,17 +83,23 @@ async function copyFileIfPresent(source, destination, fileSystem = fs) {
   }
 }
 
-function defaultSpawnUpdater(scriptPath, planPath, statusPath) {
-  const child = spawn(
-    'powershell.exe',
-    ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-PlanPath', planPath, '-StatusPath', statusPath],
-    { detached: true, stdio: 'ignore', windowsHide: true },
-  )
+function defaultSpawnUpdater(scriptPath, planPath, statusPath, launcherPath) {
+  const child = spawn('cmd.exe', ['/d', '/s', '/c', launcherPath, scriptPath, planPath, statusPath], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  })
   child.unref()
   return child
 }
 
-async function waitForUpdaterReady({ statusPath, fileSystem = fs, timeoutMs = 10000, pollIntervalMs = 50, delay = setTimeout }) {
+async function waitForUpdaterReady({
+  statusPath,
+  fileSystem = fs,
+  timeoutMs = updaterReadyTimeoutMs,
+  pollIntervalMs = 50,
+  delay = setTimeout,
+}) {
   const deadline = Date.now() + timeoutMs
   while (Date.now() < deadline) {
     try {
@@ -104,7 +111,7 @@ async function waitForUpdaterReady({ statusPath, fileSystem = fs, timeoutMs = 10
     }
     await new Promise((resolve) => delay(resolve, pollIntervalMs))
   }
-  throw new Error('升级器未能在 10 秒内启动，请检查安全软件或 PowerShell 设置')
+  throw new Error(`升级器未能在 ${Math.ceil(timeoutMs / 1000)} 秒内启动，请检查安全软件或 PowerShell 设置`)
 }
 
 function createLocalUpdateService({
@@ -115,6 +122,7 @@ function createLocalUpdateService({
   dataRoot,
   run7z,
   updaterScriptPath,
+  updaterLauncherPath,
   fileSystem = fs,
   temporaryDirectory = os.tmpdir,
   spawnUpdater = defaultSpawnUpdater,
@@ -122,7 +130,8 @@ function createLocalUpdateService({
   now = () => new Date(),
   minimumExecutableBytes = 20 * 1024 * 1024,
 }) {
-  if (typeof run7z !== 'function' || typeof spawnUpdater !== 'function') throw new Error('本地升级服务依赖不可用')
+  if (typeof run7z !== 'function' || typeof spawnUpdater !== 'function' || typeof updaterLauncherPath !== 'string' || !updaterLauncherPath)
+    throw new Error('本地升级服务依赖不可用')
   const installDirectory = path.dirname(executablePath)
 
   async function discardPreparedUpdate(prepared) {
@@ -207,11 +216,14 @@ function createLocalUpdateService({
     await fileSystem.mkdir(updatesDirectory, { recursive: true })
     const snapshotDirectory = await createPreUpdateSnapshot(prepared.targetVersion)
     const runnerPath = path.join(prepared.workDirectory, 'local-update-runner.ps1')
+    const launcherPath = path.join(prepared.workDirectory, 'local-update-launcher.cmd')
     const planPath = path.join(prepared.workDirectory, 'plan.json')
     const statusPath = path.join(prepared.workDirectory, 'status.txt')
     await fileSystem.copyFile(updaterScriptPath, runnerPath)
+    await fileSystem.copyFile(updaterLauncherPath, launcherPath)
     const token = randomUUID()
     const logPath = path.join(updatesDirectory, `update-${now().toISOString().replace(/[:.]/g, '-')}.log`)
+    await fileSystem.writeFile(logPath, `${now().toISOString()} Starting update runner.\n`, 'utf8')
     const plan = {
       format: 'starmedia-local-update-plan',
       installDirectory,
@@ -225,7 +237,7 @@ function createLocalUpdateService({
       toVersion: prepared.targetVersion,
     }
     await fileSystem.writeFile(planPath, `${JSON.stringify(plan, null, 2)}\n`, 'utf8')
-    const child = await spawnUpdater(runnerPath, planPath, statusPath)
+    const child = await spawnUpdater(runnerPath, planPath, statusPath, launcherPath)
     if (!child || typeof child.pid !== 'number') throw new Error('无法启动独立升级程序')
     await waitForReady({ statusPath, fileSystem })
     return { targetVersion: prepared.targetVersion, reinstall: prepared.reinstall, snapshotDirectory, logPath }
@@ -238,6 +250,7 @@ module.exports = {
   compareVersions,
   createLocalUpdateService,
   parseArchiveEntries,
+  updaterReadyTimeoutMs,
   validateArchiveEntries,
   waitForUpdaterReady,
 }

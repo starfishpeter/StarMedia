@@ -198,6 +198,7 @@ const localUpdateService = createLocalUpdateService({
   dataRoot: portableDataRoot,
   run7z,
   updaterScriptPath: path.join(__dirname, 'local-update-runner.ps1'),
+  updaterLauncherPath: path.join(__dirname, 'local-update-launcher.cmd'),
 })
 
 const githubUpdateService = createGitHubUpdateService({

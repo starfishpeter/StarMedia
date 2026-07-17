@@ -9,6 +9,7 @@ const {
   compareVersions,
   createLocalUpdateService,
   parseArchiveEntries,
+  updaterReadyTimeoutMs,
   validateArchiveEntries,
   waitForUpdaterReady,
 } = require('./local-update-service.cjs')
@@ -24,11 +25,16 @@ async function createSandbox(t) {
   const dataRoot = path.join(installDirectory, 'StarMediaData')
   const archivePath = path.join(root, 'StarMedia-update.zip')
   const updaterScriptPath = path.join(root, 'runner.ps1')
+  const updaterLauncherPath = path.join(root, 'launcher.cmd')
   await fs.mkdir(dataRoot, { recursive: true })
   await fs.writeFile(archivePath, 'zip placeholder')
   await fs.writeFile(updaterScriptPath, 'param([string]$PlanPath)')
+  await fs.writeFile(
+    updaterLauncherPath,
+    '@echo off\nstart "" /b powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "%~1" -PlanPath "%~2" -StatusPath "%~3" >nul 2>nul\n',
+  )
   t.after(() => fs.rm(root, { recursive: true, force: true }))
-  return { root, installDirectory, dataRoot, archivePath, updaterScriptPath }
+  return { root, installDirectory, dataRoot, archivePath, updaterLauncherPath, updaterScriptPath }
 }
 
 function createRun7zStub(version, entries) {
@@ -81,6 +87,9 @@ test('waits for updater readiness and surfaces initialization failures', async (
   await assert.doesNotReject(waitForUpdaterReady({ statusPath }))
   await fs.writeFile(statusPath, 'failed:PowerShell 被安全策略阻止')
   await assert.rejects(waitForUpdaterReady({ statusPath }), /安全策略阻止/)
+  await fs.rm(statusPath)
+  await assert.rejects(waitForUpdaterReady({ statusPath, timeoutMs: 0 }), /0 秒/)
+  assert.equal(updaterReadyTimeoutMs, 60 * 1000)
 })
 
 test('PowerShell runner reports an invalid plan through the handshake file', async (t) => {
@@ -106,6 +115,30 @@ test('PowerShell runner reports an invalid plan through the handshake file', asy
   assert.match((await fs.readFile(statusPath, 'utf8')).replace(/^\uFEFF/, '').trim(), /^failed:Invalid update plan format/)
 })
 
+test('Windows command launcher starts the updater and completes its ready handshake', { skip: process.platform !== 'win32' }, async (t) => {
+  const sandbox = await createSandbox(t)
+  await fs.writeFile(
+    sandbox.updaterScriptPath,
+    "param([string]$PlanPath, [string]$StatusPath)\nSet-Content -LiteralPath $StatusPath -Value 'ready' -Encoding UTF8\n",
+  )
+  const service = createLocalUpdateService({
+    isPackaged: true,
+    appVersion: '0.6.20',
+    executablePath: path.join(sandbox.installDirectory, 'StarMedia.exe'),
+    dataRoot: sandbox.dataRoot,
+    run7z: createRun7zStub('0.6.21', validEntries),
+    updaterLauncherPath: sandbox.updaterLauncherPath,
+    updaterScriptPath: sandbox.updaterScriptPath,
+    temporaryDirectory: () => sandbox.root,
+    minimumExecutableBytes: 1,
+  })
+
+  const prepared = await service.prepareUpdate(sandbox.archivePath)
+  const result = await service.launchPreparedUpdate(prepared)
+  assert.equal(result.targetVersion, '0.6.21')
+  await service.discardPreparedUpdate(prepared)
+})
+
 test('prepares a validated same-version package for reinstall and rejects downgrades', async (t) => {
   const sandbox = await createSandbox(t)
   const createService = (version) =>
@@ -115,6 +148,7 @@ test('prepares a validated same-version package for reinstall and rejects downgr
       executablePath: path.join(sandbox.installDirectory, 'StarMedia.exe'),
       dataRoot: sandbox.dataRoot,
       run7z: createRun7zStub(version, validEntries),
+      updaterLauncherPath: sandbox.updaterLauncherPath,
       updaterScriptPath: sandbox.updaterScriptPath,
       temporaryDirectory: () => sandbox.root,
       minimumExecutableBytes: 1,
@@ -140,12 +174,13 @@ test('creates a pre-update data snapshot and launches the detached runner with a
     processId: 4321,
     dataRoot: sandbox.dataRoot,
     run7z: createRun7zStub('0.6.21', validEntries),
+    updaterLauncherPath: sandbox.updaterLauncherPath,
     updaterScriptPath: sandbox.updaterScriptPath,
     temporaryDirectory: () => sandbox.root,
     minimumExecutableBytes: 1,
     now: () => new Date('2026-07-17T12:00:00.000Z'),
-    spawnUpdater: async (scriptPath, planPath, statusPath) => {
-      launch = { scriptPath, planPath, statusPath }
+    spawnUpdater: async (scriptPath, planPath, statusPath, launcherPath) => {
+      launch = { scriptPath, planPath, statusPath, launcherPath }
       await fs.writeFile(statusPath, 'ready')
       return { pid: 9876 }
     },
@@ -162,7 +197,9 @@ test('creates a pre-update data snapshot and launches the detached runner with a
   assert.equal(path.dirname(plan.rollbackDirectory), sandbox.installDirectory)
   assert.match(path.basename(plan.rollbackDirectory), /^\.starmedia-update-rollback-/)
   assert.equal(path.dirname(launch.scriptPath), prepared.workDirectory)
+  assert.equal(path.dirname(launch.launcherPath), prepared.workDirectory)
   assert.equal(path.dirname(launch.statusPath), prepared.workDirectory)
+  assert.match(await fs.readFile(result.logPath, 'utf8'), /^2026-07-17T12:00:00\.000Z Starting update runner\./)
 })
 
 test('refuses to launch when the active data root is not the protected sibling directory', async (t) => {
@@ -175,6 +212,7 @@ test('refuses to launch when the active data root is not the protected sibling d
     executablePath: path.join(sandbox.installDirectory, 'StarMedia.exe'),
     dataRoot: externalDataRoot,
     run7z: createRun7zStub('0.6.21', validEntries),
+    updaterLauncherPath: sandbox.updaterLauncherPath,
     updaterScriptPath: sandbox.updaterScriptPath,
     temporaryDirectory: () => sandbox.root,
     minimumExecutableBytes: 1,

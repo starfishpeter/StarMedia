@@ -115,6 +115,7 @@ async function verifyPortableApplication(rootDirectory) {
     executablePath,
     path.join(applicationRoot, 'package.json'),
     path.join(applicationRoot, 'electron', 'main.cjs'),
+    path.join(applicationRoot, 'electron', 'local-update-launcher.cmd'),
     path.join(applicationRoot, 'electron', 'local-update-runner.ps1'),
     path.join(applicationRoot, 'dist', 'index.html'),
     path.join(applicationRoot, 'node_modules', '7zip-bin', 'index.js'),

@@ -2,6 +2,12 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.27] - 2026-07-17
+
+### 修复
+
+- 改用独立的 Windows 命令引导器启动 PowerShell 升级器，修复部分系统中直接启动 PowerShell 后不执行脚本、导致握手超时的问题；升级日志会记录升级器启动尝试。
+
 ## [0.6.25] - 2026-07-17
 
 ### 改进
@@ -79,3 +85,4 @@
 [0.6.23]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.23
 [0.6.24]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.24
 [0.6.25]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.25
+[0.6.27]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.27
