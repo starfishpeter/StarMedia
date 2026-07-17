@@ -601,82 +601,89 @@ export function ContainerOverview({
                   </button>
                 </div>
               </div>
-              <p className="scrape-field-hint">
-                {scrapePreview.source === 'freeanimehentai'
-                  ? '每个值可单独修改和写入；该来源没有提供的字段不会影响现有资料。'
-                  : scrapePreview.source === 'hanime1'
-                    ? 'Hanime1 标题含附加文案时，可先修改“原名”，再只写入这一项。'
-                    : '每个按钮只写入旁边的一项，不会覆盖其他资料。'}
-              </p>
-              <div className="scrape-field-row scrape-cover-row">
-                <span>来源封面</span>
-                {scrapePreview.coverUrl && (
-                  <span className="scrape-preview-cover" style={{ backgroundImage: `url("${scrapePreview.coverUrl}")` }} />
-                )}
-                <button
-                  type="button"
-                  className="primary-button tiny-button scrape-write-button"
-                  onClick={() => void applyScrapeField('cover')}
-                  disabled={scraperStatus !== 'idle' || !scrapePreview.coverUrl}
-                >
-                  {applyingField === 'cover'
-                    ? '写入中…'
-                    : lastAppliedField === 'cover' || lastAppliedField === 'all'
-                      ? '已写入'
-                      : '写入封面'}
-                </button>
+              <div className="scrape-preview-layout">
+                <div className="scrape-preview-fields">
+                  <p className="scrape-field-hint">
+                    {scrapePreview.source === 'freeanimehentai'
+                      ? '每个值可单独修改和写入；该来源没有提供的字段不会影响现有资料。'
+                      : scrapePreview.source === 'hanime1'
+                        ? 'Hanime1 标题含附加文案时，可先修改“原名”，再只写入这一项。'
+                        : '每个按钮只写入旁边的一项，不会覆盖其他资料。'}
+                  </p>
+                  <ScrapeValueRow
+                    label="合集中文名"
+                    value={scrapeDraft.affiliation}
+                    maxLength={200}
+                    applying={applyingField === 'affiliation'}
+                    applied={lastAppliedField === 'affiliation' || lastAppliedField === 'all'}
+                    disabled={scraperStatus !== 'idle'}
+                    onChange={(value) => setScrapeDraft((current) => ({ ...current, affiliation: value }))}
+                    onApply={() => void applyScrapeField('affiliation')}
+                  />
+                  <ScrapeValueRow
+                    label="原名（用于视频目录）"
+                    value={scrapeDraft.originalTitle}
+                    maxLength={200}
+                    applying={applyingField === 'originalTitle'}
+                    applied={lastAppliedField === 'originalTitle' || lastAppliedField === 'all'}
+                    disabled={scraperStatus !== 'idle'}
+                    onChange={(value) => setScrapeDraft((current) => ({ ...current, originalTitle: value }))}
+                    onApply={() => void applyScrapeField('originalTitle')}
+                  />
+                  <ScrapeValueRow
+                    label="制作公司"
+                    value={scrapeDraft.studio}
+                    maxLength={200}
+                    applying={applyingField === 'studio'}
+                    applied={lastAppliedField === 'studio' || lastAppliedField === 'all'}
+                    disabled={scraperStatus !== 'idle'}
+                    onChange={(value) => setScrapeDraft((current) => ({ ...current, studio: value }))}
+                    onApply={() => void applyScrapeField('studio')}
+                  />
+                  <ScrapeValueRow
+                    label="第一话首播日期"
+                    value={scrapeDraft.firstAiredAt}
+                    maxLength={40}
+                    applying={applyingField === 'firstAiredAt'}
+                    applied={lastAppliedField === 'firstAiredAt' || lastAppliedField === 'all'}
+                    disabled={scraperStatus !== 'idle'}
+                    onChange={(value) => setScrapeDraft((current) => ({ ...current, firstAiredAt: value }))}
+                    onApply={() => void applyScrapeField('firstAiredAt')}
+                  />
+                  <ScrapeValueRow
+                    label="简介"
+                    value={scrapeDraft.note}
+                    maxLength={1200}
+                    multiline
+                    applying={applyingField === 'note'}
+                    applied={lastAppliedField === 'note' || lastAppliedField === 'all'}
+                    disabled={scraperStatus !== 'idle'}
+                    onChange={(value) => setScrapeDraft((current) => ({ ...current, note: value }))}
+                    onApply={() => void applyScrapeField('note')}
+                  />
+                </div>
+                <aside className="scrape-cover-card">
+                  <strong>来源封面</strong>
+                  <div
+                    className="scrape-preview-cover"
+                    style={scrapePreview.coverUrl ? { backgroundImage: `url("${scrapePreview.coverUrl}")` } : undefined}
+                  >
+                    {!scrapePreview.coverUrl && <span>无封面</span>}
+                  </div>
+                  <button
+                    type="button"
+                    className="primary-button tiny-button"
+                    onClick={() => void applyScrapeField('cover')}
+                    disabled={scraperStatus !== 'idle' || !scrapePreview.coverUrl}
+                  >
+                    {applyingField === 'cover'
+                      ? '写入中…'
+                      : lastAppliedField === 'cover' || lastAppliedField === 'all'
+                        ? '已写入封面'
+                        : '写入封面'}
+                  </button>
+                </aside>
               </div>
-              <ScrapeValueRow
-                label="合集中文名"
-                value={scrapeDraft.affiliation}
-                maxLength={200}
-                applying={applyingField === 'affiliation'}
-                applied={lastAppliedField === 'affiliation' || lastAppliedField === 'all'}
-                disabled={scraperStatus !== 'idle'}
-                onChange={(value) => setScrapeDraft((current) => ({ ...current, affiliation: value }))}
-                onApply={() => void applyScrapeField('affiliation')}
-              />
-              <ScrapeValueRow
-                label="原名（用于视频目录）"
-                value={scrapeDraft.originalTitle}
-                maxLength={200}
-                applying={applyingField === 'originalTitle'}
-                applied={lastAppliedField === 'originalTitle' || lastAppliedField === 'all'}
-                disabled={scraperStatus !== 'idle'}
-                onChange={(value) => setScrapeDraft((current) => ({ ...current, originalTitle: value }))}
-                onApply={() => void applyScrapeField('originalTitle')}
-              />
-              <ScrapeValueRow
-                label="制作公司"
-                value={scrapeDraft.studio}
-                maxLength={200}
-                applying={applyingField === 'studio'}
-                applied={lastAppliedField === 'studio' || lastAppliedField === 'all'}
-                disabled={scraperStatus !== 'idle'}
-                onChange={(value) => setScrapeDraft((current) => ({ ...current, studio: value }))}
-                onApply={() => void applyScrapeField('studio')}
-              />
-              <ScrapeValueRow
-                label="第一话首播日期"
-                value={scrapeDraft.firstAiredAt}
-                maxLength={40}
-                applying={applyingField === 'firstAiredAt'}
-                applied={lastAppliedField === 'firstAiredAt' || lastAppliedField === 'all'}
-                disabled={scraperStatus !== 'idle'}
-                onChange={(value) => setScrapeDraft((current) => ({ ...current, firstAiredAt: value }))}
-                onApply={() => void applyScrapeField('firstAiredAt')}
-              />
-              <ScrapeValueRow
-                label="简介"
-                value={scrapeDraft.note}
-                maxLength={1200}
-                multiline
-                applying={applyingField === 'note'}
-                applied={lastAppliedField === 'note' || lastAppliedField === 'all'}
-                disabled={scraperStatus !== 'idle'}
-                onChange={(value) => setScrapeDraft((current) => ({ ...current, note: value }))}
-                onApply={() => void applyScrapeField('note')}
-              />
             </section>
           )}
           {bangumiSubjects.length > 0 && (

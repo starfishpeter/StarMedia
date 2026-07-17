@@ -20,6 +20,20 @@ test('converts SRT and ASS subtitles into WebVTT cues', () => {
   )
 })
 
+test('preserves common ASS style attributes in generated WebVTT style rules', () => {
+  const vtt = convertAssToWebVtt(
+    '[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Main,Noto Sans CJK,32,&H0000FFFF,&H00000000,&H00000000,&H80000000,-1,-1,1,0,100,100,0,0,1,2,1,2,10,10,10,1\n[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,Main,,0,0,0,,Styled line',
+  )
+
+  assert.match(vtt, /::cue\(.ass-main\)/)
+  assert.match(vtt, /font-family:"Noto Sans CJK"/)
+  assert.match(vtt, /font-size:32px/)
+  assert.match(vtt, /font-weight:700/)
+  assert.match(vtt, /font-style:italic/)
+  assert.match(vtt, /text-decoration:underline/)
+  assert.match(vtt, /<c.ass-main>Styled line<\/c>/)
+})
+
 test('caches converted tracks, preserves native VTT files, and protects active cache files while pruning', async (t) => {
   const root = await createSandbox(t)
   const cacheDir = path.join(root, 'cache~encoded')

@@ -2,6 +2,18 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.29] - 2026-07-17
+
+### 改进
+
+- 移除首页，应用默认进入里番媒体库；侧栏及所有媒体库选择顺序调整为里番、番剧、原创、综合、本子、漫画。
+- 刮削预览改为字段编辑与来源封面并列的两栏布局，来源封面可在右侧大尺寸预览并单独写入。
+- ASS 字幕转换为保留常见字体、字号、颜色、粗斜体、下划线、描边和阴影的 WebVTT 样式；统一提升播放器字幕可读性。
+
+### 修复
+
+- 修复资源导入页目标媒体库控件被居中布局压缩的问题，并移除扫描说明文本。
+
 ## [0.6.28] - 2026-07-17
 
 ### 改进
@@ -100,3 +112,4 @@
 [0.6.25]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.25
 [0.6.27]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.27
 [0.6.28]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.28
+[0.6.29]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.29

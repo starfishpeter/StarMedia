@@ -9,7 +9,7 @@ import { MediaBatchMenu } from './MediaBatchMenu'
 import { MediaWall } from './MediaWall'
 import { TagEditor } from './TagEditor'
 import { VideoPlayer } from './VideoPlayer'
-import { libraryById, type MediaItem } from '../data'
+import { libraries, libraryById, type MediaItem } from '../data'
 
 const video: MediaItem = {
   id: 'video:1',
@@ -146,6 +146,7 @@ describe('renderer component smoke coverage', () => {
     )
 
     expect(markup).toContain('上传文件/文件夹')
+    expect(markup).not.toContain('扫描会查找六个受管理媒体库')
     expect(markup).toContain('Series')
     expect(markup).toContain('1 / 1')
     expect(markup).toContain('移入回收站')
@@ -153,6 +154,10 @@ describe('renderer component smoke coverage', () => {
     expect(markup).toContain('English')
     expect(markup).toContain('铺满屏幕')
     expect(markup).toContain('原始尺寸')
+  })
+
+  it('keeps media library navigation in the configured order', () => {
+    expect(libraries.map((library) => library.id)).toEqual(['erAnime', 'anime', 'creator', 'general', 'books', 'comics'])
   })
 
   it('caps the initial archive media wall DOM for large libraries', () => {

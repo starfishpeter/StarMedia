@@ -10,21 +10,121 @@ function convertAssTimeToVtt(value) {
   return `${String(Number(match[1])).padStart(2, '0')}:${match[2]}:${match[3]}.${milliseconds}`
 }
 
+function escapeVttText(value) {
+  return String(value).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+}
+
+function splitAssFields(value, count) {
+  const fields = []
+  let remainder = String(value)
+  while (fields.length < count - 1) {
+    const separator = remainder.indexOf(',')
+    if (separator < 0) return []
+    fields.push(remainder.slice(0, separator).trim())
+    remainder = remainder.slice(separator + 1)
+  }
+  fields.push(remainder.trim())
+  return fields
+}
+
+function assColorToCss(value) {
+  const hex = String(value ?? '')
+    .replace(/^&H/i, '')
+    .replace(/[^0-9a-f]/gi, '')
+    .padStart(8, '0')
+    .slice(-8)
+  if (!/^[0-9a-f]{8}$/i.test(hex)) return ''
+  const alpha = 1 - Number.parseInt(hex.slice(0, 2), 16) / 255
+  const blue = Number.parseInt(hex.slice(2, 4), 16)
+  const green = Number.parseInt(hex.slice(4, 6), 16)
+  const red = Number.parseInt(hex.slice(6, 8), 16)
+  return `rgba(${red}, ${green}, ${blue}, ${Math.round(alpha * 1000) / 1000})`
+}
+
+function assClassName(name) {
+  const normalized = String(name ?? 'Default')
+    .trim()
+    .replace(/[^a-z0-9_-]+/gi, '-')
+    .replace(/^-+|-+$/g, '')
+    .toLowerCase()
+  return `ass-${normalized || 'default'}`
+}
+
+function parseAssStyles(content) {
+  const styles = new Map()
+  let inStyleSection = false
+  let fields = []
+  for (const rawLine of String(content).split(/\r?\n/)) {
+    const line = rawLine.trim()
+    if (/^\[v4\+? styles\]$/i.test(line)) {
+      inStyleSection = true
+      continue
+    }
+    if (/^\[.+\]$/.test(line)) {
+      inStyleSection = false
+      continue
+    }
+    if (!inStyleSection) continue
+    const format = /^Format:\s*(.+)$/i.exec(line)
+    if (format) {
+      fields = format[1].split(',').map((field) => field.trim().toLowerCase())
+      continue
+    }
+    const style = /^Style:\s*(.+)$/i.exec(line)
+    if (!style || fields.length === 0) continue
+    const values = splitAssFields(style[1], fields.length)
+    if (values.length !== fields.length) continue
+    const source = Object.fromEntries(fields.map((field, index) => [field, values[index]]))
+    const name = source.name || 'Default'
+    const className = assClassName(name)
+    const fontSize = Math.max(10, Math.min(96, Math.round(Number(source.fontsize) || 24)))
+    const primaryColor = assColorToCss(source.primarycolour) || 'rgba(255, 255, 255, 1)'
+    const outlineColor = assColorToCss(source.outlinecolour) || 'rgba(0, 0, 0, 0.88)'
+    const shadowColor = assColorToCss(source.backcolour) || 'rgba(0, 0, 0, 0.62)'
+    const outline = Math.max(0, Math.min(8, Number(source.outline) || 0))
+    const shadow = Math.max(0, Math.min(8, Number(source.shadow) || 0))
+    const shadows = []
+    if (outline > 0)
+      shadows.push(
+        `${-outline}px 0 ${outlineColor}`,
+        `${outline}px 0 ${outlineColor}`,
+        `0 ${-outline}px ${outlineColor}`,
+        `0 ${outline}px ${outlineColor}`,
+      )
+    if (shadow > 0) shadows.push(`${shadow}px ${shadow}px ${shadowColor}`)
+    const rules = [
+      `color:${primaryColor}`,
+      `font-family:"${String(source.fontname ?? 'sans-serif').replace(/["\\{};]/g, '')}"`,
+      `font-size:${fontSize}px`,
+    ]
+    if (Number(source.bold) !== 0) rules.push('font-weight:700')
+    if (Number(source.italic) !== 0) rules.push('font-style:italic')
+    if (Number(source.underline) !== 0) rules.push('text-decoration:underline')
+    if (shadows.length > 0) rules.push(`text-shadow:${shadows.join(',')}`)
+    if (Number(source.borderstyle) === 3) rules.push(`background-color:${shadowColor}`)
+    styles.set(String(name).trim().toLowerCase(), { className, rules: rules.join(';') })
+  }
+  return styles
+}
+
 function convertAssToWebVtt(content) {
+  const styles = parseAssStyles(content)
   const cues = []
   for (const line of String(content).split(/\r?\n/)) {
-    const match = /^Dialogue:\s*[^,]*,([^,]*),([^,]*),(?:[^,]*,){6}(.*)$/i.exec(line)
+    const match = /^Dialogue:\s*[^,]*,([^,]*),([^,]*),([^,]*),(?:[^,]*,){5}(.*)$/i.exec(line)
     if (!match) continue
     const start = convertAssTimeToVtt(match[1])
     const end = convertAssTimeToVtt(match[2])
-    const text = match[3]
+    const style = styles.get(match[3].trim().toLowerCase()) ?? styles.get('default')
+    const text = escapeVttText(match[4])
       .replace(/\{[^}]*\}/g, '')
       .replace(/\\N/gi, '\n')
       .replace(/\\h/gi, ' ')
       .trim()
-    if (start && end && text) cues.push(`${start} --> ${end}\n${text}`)
+    if (start && end && text) cues.push(`${start} --> ${end}\n${style ? `<c.${style.className}>${text}</c>` : text}`)
   }
-  return `WEBVTT\n\n${cues.join('\n\n')}`
+  const styleSheet = [...styles.values()].map((style) => `::cue(.${style.className}) { ${style.rules} }`).join('\n')
+  return `WEBVTT${styleSheet ? `\n\nSTYLE\n${styleSheet}` : ''}\n\n${cues.join('\n\n')}`
 }
 
 function convertSrtToWebVtt(content) {

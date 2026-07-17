@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Check, FolderInput, Maximize2, Minus, Search, Settings, Tags, X } from 'lucide-react'
-import { demoMedia, homeNavigation, libraries, libraryById, type LibraryId, type MediaItem, type NavigationId } from './data'
+import { libraries, libraryById, type LibraryId, type MediaItem, type NavigationId } from './data'
 import { MediaBatchMenu } from './components/MediaBatchMenu'
 import { DetailPanel } from './components/DetailPanel'
 import { BookReader } from './components/BookReader'
@@ -9,7 +9,6 @@ import { VideoPlayer, type VideoPlayerStatus } from './components/VideoPlayer'
 import { DropdownSelect } from './components/DropdownSelect'
 import { ImportView, type ImportOperation, type ImportProgress, type ImportStatus, type ImportTarget } from './components/ImportView'
 import { LibraryBrowser } from './components/LibraryBrowserViews'
-import { HomeView } from './components/HomeView'
 import { SettingsView, VocabularyView } from './components/PreferencesViews'
 import {
   compareMediaItems,
@@ -97,7 +96,7 @@ function makeLibraryRoots(mediaRoot: string, currentRoots: StarMediaConfig['libr
 }
 
 function App() {
-  const [activeNavigation, setActiveNavigation] = useState<SectionId>('home')
+  const [activeNavigation, setActiveNavigation] = useState<SectionId>('erAnime')
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<Scope>('all')
   const [libraryBrowseStates, setLibraryBrowseStates] = useState<Record<LibraryId, LibraryBrowseState>>(createLibraryBrowseStates)
@@ -180,7 +179,7 @@ function App() {
     regenerateThumbnails: Boolean(window.starMedia?.regenerateThumbnails),
     verifyBangumiToken: Boolean(window.starMedia?.openBangumiTokenPage && window.starMedia?.verifyBangumiToken),
   }
-  const allMedia = useMemo(() => [...libraryItems, ...demoMedia], [libraryItems])
+  const allMedia = libraryItems
   const effectiveScope = scope === 'current' ? (activeLibrary?.id ?? 'all') : scope
   const scopeItems = useMemo(
     () => (effectiveScope === 'all' ? allMedia : allMedia.filter((item) => item.library === effectiveScope)),
@@ -320,11 +319,6 @@ function App() {
     setSelectedShelf(null)
     setSelectedMediaIds([])
     setMediaBatchMenu(null)
-  }
-
-  function openHomeCollection(libraryId: LibraryId, name: string) {
-    selectNavigation(libraryId)
-    setSelectedAffiliation(name)
   }
 
   function notify(message: string) {
@@ -711,7 +705,7 @@ function App() {
       setImportError(null)
       setImportProgress(null)
       setImportLibrary('auto')
-      selectNavigation('home')
+      selectNavigation('erAnime')
       notify(`已导入 ${result.importedCount} 项${result.skippedCount ? `，跳过 ${result.skippedCount} 项` : ''}。`)
     } catch (error) {
       console.error(error)
@@ -1334,12 +1328,6 @@ function App() {
         </div>
 
         <nav className="library-nav" aria-label="媒体库导航">
-          <NavigationButton
-            label={homeNavigation.label}
-            icon={<homeNavigation.icon size={20} />}
-            active={activeNavigation === 'home'}
-            onClick={() => selectNavigation('home')}
-          />
           <div className="nav-label">媒体库</div>
           {libraries.map((library) => (
             <NavigationButton
@@ -1376,8 +1364,8 @@ function App() {
 
       <main className="main-content">
         {!readerItem && !playerItem && (
-          <header className={`topbar ${activeLibrary || activeNavigation === 'home' ? 'media-topbar' : 'window-topbar'}`}>
-            {activeLibrary || activeNavigation === 'home' ? (
+          <header className={`topbar ${activeLibrary ? 'media-topbar' : 'window-topbar'}`}>
+            {activeLibrary ? (
               <>
                 <div className="search-shell">
                   <Search size={18} aria-hidden="true" />
@@ -1460,8 +1448,6 @@ function App() {
             onPlanItemChange={updateImportPlanItem}
             onPlanItemsChange={updateImportPlanItems}
           />
-        ) : activeNavigation === 'home' && !query.trim() ? (
-          <HomeView items={allMedia} onNavigate={selectNavigation} onOpen={setSelectedItem} onOpenCollection={openHomeCollection} />
         ) : (
           <LibraryBrowser
             activeLibrary={activeLibrary}
@@ -1648,7 +1634,7 @@ function WindowControls({ onRequestClose }: { onRequestClose: () => Promise<void
 }
 
 function isLibraryNavigation(id: SectionId): id is LibraryId {
-  return id !== 'home' && id !== 'import' && id !== 'settings' && id !== 'vocabularies'
+  return id !== 'import' && id !== 'settings' && id !== 'vocabularies'
 }
 
 function joinWindowsPath(root: string, child: string) {
