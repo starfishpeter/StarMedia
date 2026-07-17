@@ -16,6 +16,8 @@ const IPC_CHANNELS = Object.freeze({
   appInstallLocalUpdate: 'app:installLocalUpdate',
   appCheckGitHubUpdate: 'app:checkGitHubUpdate',
   appInstallGitHubUpdate: 'app:installGitHubUpdate',
+  appGitHubUpdateProgress: 'app:githubUpdateProgress',
+  appTestNetworkProxy: 'app:testNetworkProxy',
   bookOpen: 'book:open',
   bookGetPage: 'book:getPage',
   bookClose: 'book:close',
@@ -48,10 +50,17 @@ const IPC_CHANNELS = Object.freeze({
 })
 
 const IPC_INVOKE_CHANNELS = Object.freeze(
-  Object.values(IPC_CHANNELS).filter((channel) => ![IPC_CHANNELS.importProgress, IPC_CHANNELS.libraryThumbnailsUpdated].includes(channel)),
+  Object.values(IPC_CHANNELS).filter(
+    (channel) =>
+      ![IPC_CHANNELS.importProgress, IPC_CHANNELS.libraryThumbnailsUpdated, IPC_CHANNELS.appGitHubUpdateProgress].includes(channel),
+  ),
 )
 
-const IPC_EVENT_CHANNELS = Object.freeze([IPC_CHANNELS.importProgress, IPC_CHANNELS.libraryThumbnailsUpdated])
+const IPC_EVENT_CHANNELS = Object.freeze([
+  IPC_CHANNELS.importProgress,
+  IPC_CHANNELS.libraryThumbnailsUpdated,
+  IPC_CHANNELS.appGitHubUpdateProgress,
+])
 
 module.exports = {
   IPC_CHANNELS,

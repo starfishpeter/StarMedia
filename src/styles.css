@@ -2609,6 +2609,29 @@ select:focus {
 .scraping-card {
   width: min(100%, 640px);
 }
+.network-proxy-card {
+  width: min(100%, 640px);
+}
+.network-proxy-controls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+}
+.network-proxy-controls .settings-field {
+  width: min(100%, 560px);
+  margin: 0;
+}
+.network-proxy-help,
+.proxy-status {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+}
+.proxy-status {
+  color: var(--text-secondary);
+}
 .scraping-card .settings-field {
   width: min(100%, 560px);
   margin: 0 0 12px;
@@ -2771,6 +2794,35 @@ select:focus {
   color: var(--muted);
   font-size: 11px;
   line-height: 1.5;
+}
+.update-progress {
+  display: grid;
+  width: min(100%, 360px);
+  gap: 6px;
+}
+.update-progress > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--text-secondary);
+  font-size: 11px;
+}
+.update-progress strong {
+  font-weight: 600;
+}
+.update-progress i {
+  display: block;
+  height: 5px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.update-progress i b {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 0.18s ease;
 }
 
 .vocabulary-page {

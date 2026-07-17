@@ -46,8 +46,13 @@ test('checks a formal release and downloads only a matching SHA-256 ZIP', async 
   const release = await service.checkLatestRelease()
   assert.equal(release.updateAvailable, true)
   assert.equal(release.latestVersion, '0.6.21')
-  const downloaded = await service.downloadLatestRelease(release)
+  const progress = []
+  const downloaded = await service.downloadLatestRelease(release, { onProgress: (value) => progress.push(value) })
   assert.deepEqual(await fs.readFile(downloaded.archivePath), bytes)
+  assert.deepEqual(progress, [
+    { downloadedBytes: 0, totalBytes: bytes.length },
+    { downloadedBytes: bytes.length, totalBytes: bytes.length },
+  ])
   assert.equal(requests[0].options.headers['X-GitHub-Api-Version'], '2026-03-10')
   await service.discardDownloadedArchive(downloaded.archivePath)
   await assert.rejects(fs.stat(downloaded.archivePath), { code: 'ENOENT' })

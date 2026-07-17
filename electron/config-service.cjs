@@ -2,6 +2,7 @@ const fs = require('node:fs/promises')
 const path = require('node:path')
 const { defaultLibraryFolderNames, libraryIds } = require('./library-definitions.cjs')
 const { writeFileAtomically } = require('./library-store.cjs')
+const { normalizeProxyUrl } = require('./system-network-service.cjs')
 
 function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () => new Date() }) {
   if (typeof getConfigPaths !== 'function') throw new Error('配置路径服务不可用')
@@ -14,6 +15,10 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       theme: 'dark',
       cacheLimitMb: 4096,
       confirmBeforeClose: true,
+      network: {
+        proxyEnabled: false,
+        proxyUrl: '',
+      },
       scraping: {
         bangumiToken: '',
         bangumiEndpoint: 'https://api.bgm.tv',
@@ -112,12 +117,24 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
 
     const vocabularies = config.vocabularies && typeof config.vocabularies === 'object' ? config.vocabularies : {}
     const catalogInput = config.catalog && typeof config.catalog === 'object' ? config.catalog : {}
+    const network = config.network && typeof config.network === 'object' ? config.network : {}
     const scraping = config.scraping && typeof config.scraping === 'object' ? config.scraping : {}
     const tags = normalizeList(catalogInput.tags, normalizeList(vocabularies.tags, defaults.catalog.tags))
     const classifications = normalizeClassifications(
       Array.isArray(catalogInput.classifications) ? catalogInput.classifications : migrateLegacyClassifications(vocabularies),
       tags,
     )
+
+    const rawProxyUrl = typeof network.proxyUrl === 'string' ? network.proxyUrl.trim() : ''
+    let proxyEnabled = network.proxyEnabled === true
+    let proxyUrl = rawProxyUrl
+    if (proxyEnabled) {
+      try {
+        proxyUrl = normalizeProxyUrl(rawProxyUrl)
+      } catch {
+        proxyEnabled = false
+      }
+    }
 
     return {
       schemaVersion: 3,
@@ -126,6 +143,7 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       theme: ['dark', 'light', 'blue'].includes(config.theme) ? config.theme : 'dark',
       cacheLimitMb: normalizeCacheLimitMb(config.cacheLimitMb, defaults.cacheLimitMb),
       confirmBeforeClose: typeof config.confirmBeforeClose === 'boolean' ? config.confirmBeforeClose : defaults.confirmBeforeClose,
+      network: { proxyEnabled, proxyUrl },
       scraping: {
         bangumiToken: typeof scraping.bangumiToken === 'string' ? scraping.bangumiToken.trim() : '',
         bangumiEndpoint:

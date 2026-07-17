@@ -29,6 +29,10 @@ interface StarMediaConfig {
   theme: StarMediaTheme
   cacheLimitMb: number
   confirmBeforeClose: boolean
+  network: {
+    proxyEnabled: boolean
+    proxyUrl: string
+  }
   scraping: {
     bangumiToken: string
     bangumiEndpoint: string
@@ -216,6 +220,12 @@ interface StarMediaGitHubUpdateResult {
   assetSize?: number
 }
 
+interface StarMediaGitHubUpdateProgress {
+  stage: 'downloading' | 'preparing' | 'restarting'
+  downloadedBytes: number
+  totalBytes: number
+}
+
 interface StarMediaImportResultItem {
   id: string
   itemId?: string
@@ -237,6 +247,7 @@ interface Window {
       listener: (progress: { stage?: 'importing' | 'thumbnails' | 'saving'; current: number; total: number; fileName?: string }) => void,
     ) => () => void
     onLibraryThumbnailsUpdated?: (listener: (items: import('./data').MediaItem[]) => void) => () => void
+    onGitHubUpdateProgress?: (listener: (progress: StarMediaGitHubUpdateProgress) => void) => () => void
     getLibrary?: () => Promise<StarMediaLibraryResult>
     importMedia?: (input: {
       planId: string
@@ -357,6 +368,7 @@ interface Window {
         logPath?: string
       }
     >
+    testNetworkProxy?: () => Promise<{ status: number }>
     chooseDirectory?: () => Promise<string | null>
     chooseImportSources?: () => Promise<string[]>
     getPathForFile?: (file: File) => string

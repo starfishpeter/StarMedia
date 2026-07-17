@@ -1,5 +1,6 @@
 const path = require('node:path')
 const { libraryIds } = require('./library-definitions.cjs')
+const { normalizeProxyUrl } = require('./system-network-service.cjs')
 
 const MAX_ID_LENGTH = 4096
 const MAX_PATH_LENGTH = 32767
@@ -141,6 +142,7 @@ function parseConfig(value) {
     'theme',
     'cacheLimitMb',
     'confirmBeforeClose',
+    'network',
     'scraping',
     'libraries',
     'catalog',
@@ -150,6 +152,17 @@ function parseConfig(value) {
   if (!['dark', 'light', 'blue'].includes(config.theme)) fail('主题无效')
   if (!Number.isFinite(config.cacheLimitMb) || config.cacheLimitMb < 128 || config.cacheLimitMb > 8192) fail('缓存上限无效')
   if (typeof config.confirmBeforeClose !== 'boolean') fail('关闭确认设置无效')
+
+  const network = object(config.network, '网络配置', ['proxyEnabled', 'proxyUrl'])
+  if (typeof network.proxyEnabled !== 'boolean') fail('代理开关无效')
+  const proxyUrl = string(network.proxyUrl, '代理地址', { max: 2000, trim: true })
+  if (network.proxyEnabled) {
+    try {
+      normalizeProxyUrl(proxyUrl)
+    } catch (error) {
+      fail(error.message)
+    }
+  }
 
   const mediaRoot = string(config.mediaRoot, '媒体数据总目录', { max: MAX_PATH_LENGTH, trim: true })
   if (mediaRoot && !path.isAbsolute(mediaRoot)) fail('媒体数据总目录必须是绝对路径')
@@ -312,6 +325,7 @@ const IPC_CONTRACTS = Object.freeze({
   'app:installLocalUpdate': { request: [], response: 'StarMediaLocalUpdateResult', parse: noArguments },
   'app:checkGitHubUpdate': { request: [], response: 'StarMediaGitHubUpdateResult', parse: noArguments },
   'app:installGitHubUpdate': { request: [], response: 'StarMediaLocalUpdateResult', parse: noArguments },
+  'app:testNetworkProxy': { request: [], response: '{ status: number }', parse: noArguments },
   'book:open': {
     request: ['mediaId'],
     response: 'StarMediaBookOpenResult',
@@ -478,6 +492,7 @@ const IPC_CONTRACTS = Object.freeze({
 const IPC_EVENT_CONTRACTS = Object.freeze({
   'import:progress': { payload: 'StarMediaImportProgress' },
   'library:thumbnailsUpdated': { payload: 'MediaItem[]' },
+  'app:githubUpdateProgress': { payload: 'StarMediaGitHubUpdateProgress' },
 })
 
 function parseIpcRequest(channel, args) {

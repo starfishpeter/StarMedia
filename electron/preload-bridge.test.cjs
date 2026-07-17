@@ -25,6 +25,7 @@ test('maps every public invoke API to exactly one declared IPC channel', async (
     [IPC_CHANNELS.appInstallLocalUpdate]: () => bridge.installLocalUpdate(),
     [IPC_CHANNELS.appCheckGitHubUpdate]: () => bridge.checkGitHubUpdate(),
     [IPC_CHANNELS.appInstallGitHubUpdate]: () => bridge.installGitHubUpdate(),
+    [IPC_CHANNELS.appTestNetworkProxy]: () => bridge.testNetworkProxy(),
     [IPC_CHANNELS.bookOpen]: () => bridge.openBook('book:1'),
     [IPC_CHANNELS.bookGetPage]: () => bridge.getBookPage('00000000-0000-4000-8000-000000000000', 1, { force: true }),
     [IPC_CHANNELS.bookClose]: () => bridge.closeBook('00000000-0000-4000-8000-000000000000'),
@@ -81,21 +82,27 @@ test('forwards event payloads and unsubscribes listeners from their specific cha
   })
   const progress = []
   const thumbnails = []
+  const updates = []
   const stopProgress = bridge.onImportProgress((value) => progress.push(value))
   const stopThumbnails = bridge.onLibraryThumbnailsUpdated((value) => thumbnails.push(value))
+  const stopUpdates = bridge.onGitHubUpdateProgress((value) => updates.push(value))
 
   subscriptions[0].listener({ current: 1 })
   subscriptions[1].listener([{ id: 'video:1' }])
+  subscriptions[2].listener({ stage: 'downloading', downloadedBytes: 1, totalBytes: 2 })
   stopProgress()
   stopThumbnails()
+  stopUpdates()
 
   assert.deepEqual(progress, [{ current: 1 }])
   assert.deepEqual(thumbnails, [[{ id: 'video:1' }]])
+  assert.deepEqual(updates, [{ stage: 'downloading', downloadedBytes: 1, totalBytes: 2 }])
   assert.deepEqual(
     subscriptions.map(({ channel, removed }) => ({ channel, removed })),
     [
       { channel: IPC_CHANNELS.importProgress, removed: true },
       { channel: IPC_CHANNELS.libraryThumbnailsUpdated, removed: true },
+      { channel: IPC_CHANNELS.appGitHubUpdateProgress, removed: true },
     ],
   )
 })

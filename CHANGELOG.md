@@ -2,6 +2,16 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.24] - 2026-07-17
+
+### 新增
+
+- 设置页新增应用网络代理开关、HTTP/SOCKS5 代理地址和 GitHub 连通性测试；启用后 GitHub 更新与全部在线刮削请求都使用该代理。
+
+### 修复
+
+- GitHub 更新下载显示实时字节进度，并在升级器就绪后立即退出、安装和重启，移除固定延时退出的竞态。
+
 ## [0.6.23] - 2026-07-17
 
 ### 新增
@@ -61,3 +71,4 @@
 [0.6.21]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.21
 [0.6.22]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.22
 [0.6.23]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.23
+[0.6.24]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.24

@@ -3,6 +3,7 @@ import {
   FolderOpen,
   HardDrive,
   LibraryBig,
+  Network,
   PackageOpen,
   Plus,
   Search,
@@ -25,6 +26,7 @@ export type SettingsCapabilities = {
   importAppData: boolean
   installLocalUpdate: boolean
   githubUpdate: boolean
+  testNetworkProxy: boolean
   regenerateThumbnails: boolean
   verifyBangumiToken: boolean
 }
@@ -51,6 +53,7 @@ export function SettingsView({
   onInstallLocalUpdate,
   installingLocalUpdate,
   githubUpdate,
+  githubUpdateProgress,
   checkingGitHubUpdate,
   onCheckGitHubUpdate,
   onInstallGitHubUpdate,
@@ -58,6 +61,7 @@ export function SettingsView({
   onClearCaches,
   onOpenBangumiTokenPage,
   onVerifyBangumiToken,
+  onTestNetworkProxy,
 }: {
   config: StarMediaConfig
   configMeta: { dataRoot: string; configPath: string; backupDir: string; cacheDir: string }
@@ -75,6 +79,7 @@ export function SettingsView({
   onInstallLocalUpdate: () => void
   installingLocalUpdate: boolean
   githubUpdate: StarMediaGitHubUpdateResult | null
+  githubUpdateProgress: StarMediaGitHubUpdateProgress | null
   checkingGitHubUpdate: boolean
   onCheckGitHubUpdate: () => void
   onInstallGitHubUpdate: () => void
@@ -82,10 +87,13 @@ export function SettingsView({
   onClearCaches: () => void
   onOpenBangumiTokenPage: () => void
   onVerifyBangumiToken: () => Promise<{ valid: boolean; expiresAt: string | null; userName: string }>
+  onTestNetworkProxy: (config: StarMediaConfig) => Promise<{ status: number }>
 }) {
-  const [tab, setTab] = useState<'app' | 'paths' | 'scraping'>('app')
+  const [tab, setTab] = useState<'app' | 'paths' | 'network' | 'scraping'>('app')
   const [tokenStatus, setTokenStatus] = useState('')
   const [verifyingToken, setVerifyingToken] = useState(false)
+  const [proxyStatus, setProxyStatus] = useState('')
+  const [testingProxy, setTestingProxy] = useState(false)
 
   function updateLibraryRoot(id: LibraryId, rootPath: string) {
     onChange({ ...config, libraries: { ...config.libraries, [id]: { ...config.libraries[id], rootPath } } })
@@ -109,6 +117,19 @@ export function SettingsView({
     }
   }
 
+  async function testNetworkProxy() {
+    setTestingProxy(true)
+    setProxyStatus('')
+    try {
+      const result = await onTestNetworkProxy(config)
+      setProxyStatus(`代理已连接 GitHub（HTTP ${result.status}）。`)
+    } catch (error) {
+      setProxyStatus(error instanceof Error ? error.message : '代理连接测试失败')
+    } finally {
+      setTestingProxy(false)
+    }
+  }
+
   return (
     <section className="utility-page settings-page">
       <div className="settings-layout">
@@ -120,6 +141,10 @@ export function SettingsView({
           <button className={tab === 'paths' ? 'active' : ''} onClick={() => setTab('paths')}>
             <HardDrive size={16} />
             <span>本地资源路径</span>
+          </button>
+          <button className={tab === 'network' ? 'active' : ''} onClick={() => setTab('network')}>
+            <Network size={16} />
+            <span>网络代理</span>
           </button>
           <button className={tab === 'scraping' ? 'active' : ''} onClick={() => setTab('scraping')}>
             <Search size={16} />
@@ -236,7 +261,11 @@ export function SettingsView({
                       {checkingGitHubUpdate
                         ? '正在检查更新…'
                         : installingLocalUpdate
-                          ? '正在下载并校验…'
+                          ? githubUpdateProgress?.stage === 'downloading'
+                            ? `正在下载 ${Math.floor((githubUpdateProgress.downloadedBytes / githubUpdateProgress.totalBytes) * 100)}%…`
+                            : githubUpdateProgress?.stage === 'restarting'
+                              ? '正在重启…'
+                              : '正在校验并准备升级…'
                           : githubUpdate?.updateAvailable
                             ? `下载并安装 ${githubUpdate.latestVersion}`
                             : '检查 GitHub 更新'}
@@ -249,6 +278,34 @@ export function SettingsView({
                       选择本地升级包
                     </button>
                   </div>
+                  {githubUpdateProgress && (
+                    <div
+                      className="update-progress"
+                      role="progressbar"
+                      aria-label="GitHub 更新下载进度"
+                      aria-valuemin={0}
+                      aria-valuemax={githubUpdateProgress.totalBytes}
+                      aria-valuenow={githubUpdateProgress.downloadedBytes}
+                    >
+                      <div>
+                        <strong>
+                          {githubUpdateProgress.stage === 'downloading'
+                            ? '正在下载更新包'
+                            : githubUpdateProgress.stage === 'preparing'
+                              ? '正在校验并准备安装'
+                              : '正在退出并重启应用'}
+                        </strong>
+                        <span>{Math.floor((githubUpdateProgress.downloadedBytes / githubUpdateProgress.totalBytes) * 100)}%</span>
+                      </div>
+                      <i>
+                        <b
+                          style={{
+                            width: `${Math.floor((githubUpdateProgress.downloadedBytes / githubUpdateProgress.totalBytes) * 100)}%`,
+                          }}
+                        />
+                      </i>
+                    </div>
+                  )}
                   <small>
                     {githubUpdate && !githubUpdate.updateAvailable
                       ? `当前版本 ${githubUpdate.currentVersion} 已是最新正式版。`
@@ -358,6 +415,48 @@ export function SettingsView({
                 </div>
               </article>
             </>
+          )}
+
+          {tab === 'network' && (
+            <article className="settings-card network-proxy-card">
+              <div className="card-title">
+                <Network size={18} />
+                <div>
+                  <h2>应用网络代理</h2>
+                  <p>启用后，GitHub 更新和全部在线刮削都通过此代理；关闭后始终直连。</p>
+                </div>
+              </div>
+              <div className="network-proxy-controls">
+                <label className="toggle-pill">
+                  <input
+                    type="checkbox"
+                    checked={config.network.proxyEnabled}
+                    onChange={(event) => onChange({ ...config, network: { ...config.network, proxyEnabled: event.target.checked } })}
+                  />
+                  启用应用代理
+                </label>
+                <label className="settings-field">
+                  <span>代理地址</span>
+                  <input
+                    value={config.network.proxyUrl}
+                    onChange={(event) => onChange({ ...config, network: { ...config.network, proxyUrl: event.target.value } })}
+                    placeholder="http://127.0.0.1:8390"
+                    spellCheck={false}
+                  />
+                </label>
+                <div className="bangumi-token-help">
+                  <button
+                    className="secondary-button"
+                    onClick={() => void testNetworkProxy()}
+                    disabled={!capabilities.testNetworkProxy || !config.network.proxyEnabled || testingProxy}
+                  >
+                    {testingProxy ? '测试中…' : '测试 GitHub 连接'}
+                  </button>
+                </div>
+                <small className="network-proxy-help">FlClash 混合端口推荐填入 http://127.0.0.1:8390，也支持 socks5:// 地址。</small>
+                {proxyStatus && <p className="proxy-status">{proxyStatus}</p>}
+              </div>
+            </article>
           )}
 
           {tab === 'scraping' && (

@@ -13,6 +13,7 @@ function loadMainWithElectronMock(t) {
   const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starmedia-main-ipc-test-'))
   const handlers = new Map()
   const windows = []
+  const proxyConfigurations = []
   class BrowserWindow {
     constructor(options) {
       this.options = options
@@ -94,6 +95,7 @@ function loadMainWithElectronMock(t) {
     },
     ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
     net: { fetch: async () => new Response('') },
+    session: { defaultSession: { setProxy: async (configuration) => proxyConfigurations.push(configuration) } },
     shell: { trashItem: async () => {}, openPath: async () => '', openExternal: async () => '' },
   }
   const mainPath = path.join(workspaceRoot, 'electron', 'main.cjs')
@@ -113,11 +115,11 @@ function loadMainWithElectronMock(t) {
     delete require.cache[mainPath]
     return fsPromises.rm(dataRoot, { recursive: true, force: true })
   })
-  return { dataRoot, handlers, main, windows }
+  return { dataRoot, handlers, main, proxyConfigurations, windows }
 }
 
 test('registers every declared IPC handler and rejects untrusted senders before parsing requests', async (t) => {
-  const { handlers, main, windows } = loadMainWithElectronMock(t)
+  const { handlers, main, proxyConfigurations, windows } = loadMainWithElectronMock(t)
   main.createWindow()
   main.registerIpc()
 
@@ -141,6 +143,10 @@ test('registers every declared IPC handler and rejects untrusted senders before 
   const config = await handlers.get(IPC_CHANNELS.configLoad)(event)
   config.config.confirmBeforeClose = false
   await handlers.get(IPC_CHANNELS.configSave)(event, config.config)
+  assert.deepEqual(proxyConfigurations.at(-1), { mode: 'direct' })
+  config.config.network = { proxyEnabled: true, proxyUrl: 'http://127.0.0.1:8390' }
+  await handlers.get(IPC_CHANNELS.configSave)(event, config.config)
+  assert.deepEqual(proxyConfigurations.at(-1), { mode: 'fixed_servers', proxyRules: 'http=127.0.0.1:8390;https=127.0.0.1:8390' })
   assert.equal(await handlers.get(IPC_CHANNELS.windowClose)(event), 'closed')
   assert.equal(window.closed, true)
 })

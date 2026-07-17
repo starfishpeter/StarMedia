@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, shell } = require('electron')
+const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, session, shell } = require('electron')
 const fs = require('node:fs/promises')
 const fssync = require('node:fs')
 const { randomUUID } = require('node:crypto')
@@ -35,7 +35,7 @@ const { clearEmptyMediaDirectories: clearEmptyMediaDirectoriesForConfig } = requ
 const { createPortableDataService } = require('./portable-data-service.cjs')
 const { createScraperAdapters } = require('./scraper-adapters.cjs')
 const { createScraperApplicationService } = require('./scraper-application-service.cjs')
-const { createSystemNetworkFetch } = require('./system-network-service.cjs')
+const { createNetworkProxyService, createSystemNetworkFetch } = require('./system-network-service.cjs')
 const { createSubtitlePlaybackTracks } = require('./subtitle-cache-service.cjs')
 const { extractMatroskaSubtitles } = require('./matroska-subtitle-service.cjs')
 const { createThumbnailService, getCurrentArchiveCoverPath } = require('./thumbnail-service.cjs')
@@ -149,7 +149,26 @@ const { loadConfig, saveConfig } = createConfigService({ getConfigPaths, default
 
 const bookCoverThumbnailService = createBookCoverThumbnailService({ nativeImage, writeFileAtomically })
 
-const fetchWithSystemNetwork = createSystemNetworkFetch({ electronFetch: (...args) => net.fetch(...args) })
+let networkProxyService = null
+const fetchWithSystemNetwork = createSystemNetworkFetch({
+  electronFetch: (url, options = {}) => net.fetch(url, { ...options, session: session.defaultSession }),
+  isProxyEnabled: () => networkProxyService?.isEnabled() ?? false,
+})
+
+function getNetworkProxyService() {
+  if (!networkProxyService) networkProxyService = createNetworkProxyService({ electronSession: session.defaultSession })
+  return networkProxyService
+}
+
+async function configureNetworkProxy(config) {
+  return getNetworkProxyService().configure(config)
+}
+
+async function saveConfigWithNetworkProxy(config) {
+  const result = await saveConfig(config)
+  await configureNetworkProxy(result.config)
+  return result
+}
 
 const scraperAdapters = createScraperAdapters({
   loadConfig,
@@ -885,7 +904,20 @@ function isPortableDataExportInProgress() {
 }
 
 async function importPortableData(backupPath) {
-  return portableDataService.importBackup(backupPath)
+  const result = await portableDataService.importBackup(backupPath)
+  await configureNetworkProxy(result.config)
+  return result
+}
+
+function sendGitHubUpdateProgress(owner, progress) {
+  if (!owner || owner.isDestroyed() || owner.webContents.isDestroyed()) return
+  owner.webContents.send(IPC_CHANNELS.appGitHubUpdateProgress, progress)
+}
+
+function quitForLocalUpdate() {
+  localUpdateQuitRequested = true
+  for (const window of BrowserWindow.getAllWindows()) approvedWindowCloses.add(window)
+  app.quit()
 }
 
 async function installLocalUpdate(owner) {
@@ -920,9 +952,7 @@ async function installLocalUpdate(owner) {
     }
 
     const result = await localUpdateService.launchPreparedUpdate(prepared)
-    localUpdateQuitRequested = true
-    for (const window of BrowserWindow.getAllWindows()) approvedWindowCloses.add(window)
-    setTimeout(() => app.quit(), 250)
+    quitForLocalUpdate()
     return { canceled: false, ...result }
   } catch (error) {
     await localUpdateService.discardPreparedUpdate(prepared).catch(() => {})
@@ -940,6 +970,17 @@ function publicGitHubRelease(release) {
 async function checkGitHubUpdate() {
   if (!app.isPackaged) throw new Error('GitHub 更新只能在打包版中使用')
   return publicGitHubRelease(await githubUpdateService.checkLatestRelease())
+}
+
+async function testNetworkProxy() {
+  const config = await loadConfig()
+  if (!config.network.proxyEnabled) throw new Error('请先启用应用代理')
+  await configureNetworkProxy(config)
+  const response = await fetchWithSystemNetwork('https://api.github.com/rate_limit', {
+    headers: { Accept: 'application/vnd.github+json', 'User-Agent': `StarMedia/${app.getVersion()}` },
+    redirect: 'error',
+  })
+  return { status: response.status }
 }
 
 async function installGitHubUpdate(owner) {
@@ -963,14 +1004,17 @@ async function installGitHubUpdate(owner) {
   let download
   let prepared
   try {
-    download = await githubUpdateService.downloadLatestRelease(release)
+    sendGitHubUpdateProgress(owner, { stage: 'downloading', downloadedBytes: 0, totalBytes: release.assetSize })
+    download = await githubUpdateService.downloadLatestRelease(release, {
+      onProgress: (progress) => sendGitHubUpdateProgress(owner, { stage: 'downloading', ...progress }),
+    })
+    sendGitHubUpdateProgress(owner, { stage: 'preparing', downloadedBytes: download.downloadedBytes, totalBytes: release.assetSize })
     prepared = await localUpdateService.prepareUpdate(download.archivePath)
     await githubUpdateService.discardDownloadedArchive(download.archivePath)
     download = null
     const result = await localUpdateService.launchPreparedUpdate(prepared)
-    localUpdateQuitRequested = true
-    for (const window of BrowserWindow.getAllWindows()) approvedWindowCloses.add(window)
-    setTimeout(() => app.quit(), 250)
+    sendGitHubUpdateProgress(owner, { stage: 'restarting', downloadedBytes: release.assetSize, totalBytes: release.assetSize })
+    quitForLocalUpdate()
     return { canceled: false, updateAvailable: true, ...result }
   } catch (error) {
     if (prepared) await localUpdateService.discardPreparedUpdate(prepared).catch(() => {})
@@ -991,7 +1035,7 @@ function registerIpc() {
     return { config: await loadConfig(), appVersion: app.getVersion(), ...paths }
   })
 
-  handle(IPC_CHANNELS.configSave, async (_event, config) => withFileOperationLock(() => saveConfig(config)))
+  handle(IPC_CHANNELS.configSave, async (_event, config) => withFileOperationLock(() => saveConfigWithNetworkProxy(config)))
 
   handle(IPC_CHANNELS.importCreatePlan, async (_event, input) => createImportPlan(input))
 
@@ -1019,6 +1063,8 @@ function registerIpc() {
   )
 
   handle(IPC_CHANNELS.appCheckGitHubUpdate, async () => checkGitHubUpdate())
+
+  handle(IPC_CHANNELS.appTestNetworkProxy, async () => testNetworkProxy())
 
   handle(IPC_CHANNELS.appInstallGitHubUpdate, async (event) =>
     withFileOperationLock(() => installGitHubUpdate(BrowserWindow.fromWebContents(event.sender))),
@@ -1156,10 +1202,15 @@ function createWindow() {
 
 if (require.main === module) {
   if (ownsSingleInstance) {
-    app.whenReady().then(() => {
+    app.whenReady().then(async () => {
       app.setName('StarMedia')
       app.setAppUserModelId('com.starmedia.app')
       Menu.setApplicationMenu(null)
+      try {
+        await configureNetworkProxy(await loadConfig())
+      } catch (error) {
+        console.error(`Failed to configure network proxy: ${error.message}`)
+      }
       registerIpc()
       createWindow()
 

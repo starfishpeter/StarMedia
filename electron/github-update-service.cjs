@@ -89,8 +89,9 @@ function createGitHubUpdateService({
     await fileSystem.rm(resolved, { force: true })
   }
 
-  async function downloadLatestRelease(release) {
+  async function downloadLatestRelease(release, { onProgress } = {}) {
     if (!release?.updateAvailable || !release?.asset) throw new Error('当前没有可下载的 GitHub 更新')
+    if (onProgress !== undefined && typeof onProgress !== 'function') throw new Error('GitHub 更新下载进度回调无效')
     const archivePath = path.join(temporaryDirectory(), `StarMedia-github-update-${randomId()}.zip`)
     let fileHandle
     try {
@@ -100,6 +101,15 @@ function createGitHubUpdateService({
       const hash = createHash('sha256')
       const reader = response.body.getReader()
       let downloadedBytes = 0
+      let reportedPercentage = -1
+      const reportProgress = () => {
+        if (!onProgress) return
+        const percentage = Math.floor((downloadedBytes / release.asset.size) * 100)
+        if (percentage === reportedPercentage) return
+        reportedPercentage = percentage
+        onProgress({ downloadedBytes, totalBytes: release.asset.size })
+      }
+      reportProgress()
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
@@ -108,6 +118,7 @@ function createGitHubUpdateService({
         if (downloadedBytes > release.asset.size || downloadedBytes > maxArchiveBytes) throw new Error('GitHub 更新下载体积超过预期')
         hash.update(chunk)
         await fileHandle.write(chunk)
+        reportProgress()
       }
       await fileHandle.close()
       fileHandle = null

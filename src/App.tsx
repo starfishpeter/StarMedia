@@ -56,6 +56,10 @@ const fallbackConfig: StarMediaConfig = {
   theme: 'dark',
   cacheLimitMb: 4096,
   confirmBeforeClose: true,
+  network: {
+    proxyEnabled: false,
+    proxyUrl: '',
+  },
   scraping: {
     bangumiToken: '',
     bangumiEndpoint: 'https://api.bgm.tv',
@@ -108,6 +112,7 @@ function App() {
   const [installingLocalUpdate, setInstallingLocalUpdate] = useState(false)
   const [checkingGitHubUpdate, setCheckingGitHubUpdate] = useState(false)
   const [githubUpdate, setGitHubUpdate] = useState<StarMediaGitHubUpdateResult | null>(null)
+  const [githubUpdateProgress, setGitHubUpdateProgress] = useState<StarMediaGitHubUpdateProgress | null>(null)
   const [appVersion, setAppVersion] = useState('')
   const [config, setConfig] = useState<StarMediaConfig>(fallbackConfig)
   const [configMeta, setConfigMeta] = useState({ dataRoot: '', configPath: '', backupDir: '', cacheDir: '' })
@@ -171,6 +176,7 @@ function App() {
     importAppData: Boolean(window.starMedia?.chooseAppDataBackup && window.starMedia?.importAppData),
     installLocalUpdate: Boolean(window.starMedia?.installLocalUpdate),
     githubUpdate: Boolean(window.starMedia?.checkGitHubUpdate && window.starMedia?.installGitHubUpdate),
+    testNetworkProxy: Boolean(window.starMedia?.testNetworkProxy),
     regenerateThumbnails: Boolean(window.starMedia?.regenerateThumbnails),
     verifyBangumiToken: Boolean(window.starMedia?.openBangumiTokenPage && window.starMedia?.verifyBangumiToken),
   }
@@ -374,6 +380,8 @@ function App() {
   }, [config])
 
   useEffect(() => window.starMedia?.onImportProgress?.((progress) => setImportProgress(progress)), [])
+
+  useEffect(() => window.starMedia?.onGitHubUpdateProgress?.((progress) => setGitHubUpdateProgress(progress)), [])
 
   useEffect(
     () =>
@@ -809,6 +817,7 @@ function App() {
   async function installGitHubUpdate() {
     if (!window.starMedia?.installGitHubUpdate || installingLocalUpdate) return
     setInstallingLocalUpdate(true)
+    setGitHubUpdateProgress(null)
     try {
       const result = await window.starMedia.installGitHubUpdate()
       if (result.canceled) return
@@ -821,6 +830,7 @@ function App() {
     } catch (error) {
       console.error(error)
       notify(error instanceof Error ? `安装 GitHub 更新失败：${error.message}` : '安装 GitHub 更新失败。')
+      setGitHubUpdateProgress(null)
     } finally {
       setInstallingLocalUpdate(false)
     }
@@ -1301,6 +1311,12 @@ function App() {
     return window.starMedia.verifyBangumiToken()
   }
 
+  async function testNetworkProxy(configToTest: StarMediaConfig) {
+    if (!window.starMedia?.testNetworkProxy) throw new Error('当前运行环境无法测试应用代理。')
+    if (!(await persistConfig(configToTest))) throw new Error('代理配置保存失败。')
+    return window.starMedia.testNetworkProxy()
+  }
+
   function updateMediaRoot(mediaRoot: string) {
     setConfig((current) => ({
       ...current,
@@ -1414,6 +1430,7 @@ function App() {
             onInstallLocalUpdate={installLocalUpdate}
             installingLocalUpdate={installingLocalUpdate}
             githubUpdate={githubUpdate}
+            githubUpdateProgress={githubUpdateProgress}
             checkingGitHubUpdate={checkingGitHubUpdate}
             onCheckGitHubUpdate={checkGitHubUpdate}
             onInstallGitHubUpdate={installGitHubUpdate}
@@ -1421,6 +1438,7 @@ function App() {
             onClearCaches={clearCaches}
             onOpenBangumiTokenPage={openBangumiTokenPage}
             onVerifyBangumiToken={verifyBangumiToken}
+            onTestNetworkProxy={testNetworkProxy}
           />
         ) : activeNavigation === 'vocabularies' ? (
           <VocabularyView config={config} onChange={setConfig} />

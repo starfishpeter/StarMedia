@@ -36,6 +36,7 @@ test('creates stable defaults for every known library without persisting on load
   assert.equal(config.schemaVersion, 3)
   assert.equal(config.updatedAt, fixedDate.toISOString())
   assert.equal(config.scraping.hanime1Endpoint, 'https://hanime1.com')
+  assert.deepEqual(config.network, { proxyEnabled: false, proxyUrl: '' })
   assert.deepEqual(Object.keys(config.libraries), libraryIds)
   assert.equal(
     libraryIds.every((id) => config.libraries[id].rootPath === '' && config.libraries[id].enabled),
@@ -50,6 +51,7 @@ test('sanitizes configuration values and migrates legacy classifications', async
     mediaRoot: '  C:\\Media  ',
     theme: 'unsupported',
     cacheLimitMb: 4,
+    network: { proxyEnabled: true, proxyUrl: ' 127.0.0.1:8390 ' },
     scraping: { bangumiToken: ' token ', bangumiEndpoint: ' https://example.test ', hanime1Endpoint: ' ' },
     vocabularies: {
       tags: [' 动作 ', '动作', '科幻'],
@@ -68,6 +70,7 @@ test('sanitizes configuration values and migrates legacy classifications', async
   assert.equal(config.scraping.bangumiToken, 'token')
   assert.equal(config.scraping.bangumiEndpoint, 'https://example.test')
   assert.equal(config.scraping.hanime1Endpoint, 'https://hanime1.com')
+  assert.deepEqual(config.network, { proxyEnabled: true, proxyUrl: 'http://127.0.0.1:8390' })
   assert.deepEqual(config.catalog.tags, ['动作', '科幻'])
   assert.deepEqual(config.catalog.studios, ['Studio'])
   assert.deepEqual(config.catalog.creators, ['Creator'])

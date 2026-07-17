@@ -1,7 +1,7 @@
 {
   "name": "starmedia",
   "private": true,
-  "version": "0.6.23",
+  "version": "0.6.24",
   "description": "A local-first Windows media library prototype.",
   "main": "electron/main.cjs",
   "scripts": {

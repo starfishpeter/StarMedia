@@ -9,6 +9,7 @@ const config: StarMediaConfig = {
   theme: 'dark',
   cacheLimitMb: 4096,
   confirmBeforeClose: true,
+  network: { proxyEnabled: false, proxyUrl: '' },
   scraping: { bangumiToken: '', bangumiEndpoint: 'https://api.bgm.tv', hanime1Endpoint: 'https://hanime1.com' },
   libraries: {
     erAnime: { rootPath: 'C:\\Media\\里番', enabled: true },
@@ -37,6 +38,7 @@ describe('SettingsView', () => {
           importAppData: true,
           installLocalUpdate: true,
           githubUpdate: true,
+          testNetworkProxy: true,
           regenerateThumbnails: true,
           verifyBangumiToken: true,
         }}
@@ -52,6 +54,7 @@ describe('SettingsView', () => {
         onInstallLocalUpdate={() => {}}
         installingLocalUpdate={false}
         githubUpdate={null}
+        githubUpdateProgress={null}
         checkingGitHubUpdate={false}
         onCheckGitHubUpdate={() => {}}
         onInstallGitHubUpdate={() => {}}
@@ -59,6 +62,7 @@ describe('SettingsView', () => {
         onClearCaches={() => {}}
         onOpenBangumiTokenPage={() => {}}
         onVerifyBangumiToken={async () => ({ valid: true, expiresAt: null, userName: '' })}
+        onTestNetworkProxy={async () => ({ status: 200 })}
       />,
     )
 
@@ -67,6 +71,7 @@ describe('SettingsView', () => {
     expect(markup).toContain('C:\\StarMediaData')
     expect(markup).toContain('0.6.21')
     expect(markup).toContain('选择本地升级包')
+    expect(markup).toContain('网络代理')
   })
 
   it('keeps application-data import enabled when unrelated maintenance APIs are unavailable', () => {
@@ -84,6 +89,7 @@ describe('SettingsView', () => {
           importAppData: true,
           installLocalUpdate: false,
           githubUpdate: false,
+          testNetworkProxy: false,
           regenerateThumbnails: false,
           verifyBangumiToken: false,
         }}
@@ -99,6 +105,7 @@ describe('SettingsView', () => {
         onInstallLocalUpdate={() => {}}
         installingLocalUpdate={false}
         githubUpdate={null}
+        githubUpdateProgress={null}
         checkingGitHubUpdate={false}
         onCheckGitHubUpdate={() => {}}
         onInstallGitHubUpdate={() => {}}
@@ -106,6 +113,7 @@ describe('SettingsView', () => {
         onClearCaches={() => {}}
         onOpenBangumiTokenPage={() => {}}
         onVerifyBangumiToken={async () => ({ valid: true, expiresAt: null, userName: '' })}
+        onTestNetworkProxy={async () => ({ status: 200 })}
       />,
     )
 

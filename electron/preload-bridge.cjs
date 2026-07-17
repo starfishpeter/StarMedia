@@ -17,6 +17,7 @@ function createPreloadBridge({ invoke, subscribe, getPathForFile }) {
     createImportPlan: (input) => call(IPC_CHANNELS.importCreatePlan, input),
     onImportProgress: (listener) => subscribe(IPC_CHANNELS.importProgress, listener),
     onLibraryThumbnailsUpdated: (listener) => subscribe(IPC_CHANNELS.libraryThumbnailsUpdated, listener),
+    onGitHubUpdateProgress: (listener) => subscribe(IPC_CHANNELS.appGitHubUpdateProgress, listener),
     getLibrary: () => call(IPC_CHANNELS.libraryLoad),
     importMedia: (input) => call(IPC_CHANNELS.libraryImportMedia, input),
     clearImportedRecords: () => call(IPC_CHANNELS.libraryClearRecords),
@@ -26,6 +27,7 @@ function createPreloadBridge({ invoke, subscribe, getPathForFile }) {
     installLocalUpdate: () => call(IPC_CHANNELS.appInstallLocalUpdate),
     checkGitHubUpdate: () => call(IPC_CHANNELS.appCheckGitHubUpdate),
     installGitHubUpdate: () => call(IPC_CHANNELS.appInstallGitHubUpdate),
+    testNetworkProxy: () => call(IPC_CHANNELS.appTestNetworkProxy),
     openBook: (id) => call(IPC_CHANNELS.bookOpen, id),
     getBookPage: (sessionId, index, options) =>
       options === undefined ? call(IPC_CHANNELS.bookGetPage, sessionId, index) : call(IPC_CHANNELS.bookGetPage, sessionId, index, options),
