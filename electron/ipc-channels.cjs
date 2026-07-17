@@ -1,0 +1,58 @@
+const IPC_CHANNELS = Object.freeze({
+  configLoad: 'config:load',
+  configSave: 'config:save',
+  importCreatePlan: 'import:createPlan',
+  importProgress: 'import:progress',
+  libraryLoad: 'library:load',
+  libraryImportMedia: 'library:importMedia',
+  libraryClearRecords: 'library:clearRecords',
+  libraryThumbnailsUpdated: 'library:thumbnailsUpdated',
+  videoGetPlayback: 'video:getPlayback',
+  videoGetPlaybackSupport: 'video:getPlaybackSupport',
+  videoOpenExternal: 'video:openExternal',
+  videoUpdateMetadata: 'video:updateMetadata',
+  appExportData: 'app:exportData',
+  appImportData: 'app:importData',
+  appInstallLocalUpdate: 'app:installLocalUpdate',
+  bookOpen: 'book:open',
+  bookGetPage: 'book:getPage',
+  bookClose: 'book:close',
+  libraryUpdateContainerTags: 'library:updateContainerTags',
+  libraryUpdateContainerInfo: 'library:updateContainerInfo',
+  libraryUpdateMediaInfo: 'library:updateMediaInfo',
+  libraryUpdateVideoEpisode: 'library:updateVideoEpisode',
+  libraryUpdateBookShelves: 'library:updateBookShelves',
+  libraryTransferItems: 'library:transferItems',
+  libraryMoveVideoAffiliation: 'library:moveVideoAffiliation',
+  libraryTrashItems: 'library:trashItems',
+  libraryRegenerateThumbnails: 'library:regenerateThumbnails',
+  libraryClearCaches: 'library:clearCaches',
+  libraryClearEmptyMediaDirectories: 'library:clearEmptyMediaDirectories',
+  systemOpenPath: 'system:openPath',
+  bangumiSearchSubjects: 'bangumi:searchSubjects',
+  bangumiPreviewSubject: 'bangumi:previewSubject',
+  bangumiApplySubject: 'bangumi:applySubject',
+  bangumiOpenTokenPage: 'bangumi:openTokenPage',
+  bangumiVerifyToken: 'bangumi:verifyToken',
+  hanimeSearchSubjects: 'hanime:searchSubjects',
+  hanimePreviewSubject: 'hanime:previewSubject',
+  hanimeApplySubject: 'hanime:applySubject',
+  windowMinimize: 'window:minimize',
+  windowToggleMaximize: 'window:toggleMaximize',
+  windowClose: 'window:close',
+  dialogChooseDirectory: 'dialog:chooseDirectory',
+  dialogChooseImportSources: 'dialog:chooseImportSources',
+  dialogChooseAppDataBackup: 'dialog:chooseAppDataBackup',
+})
+
+const IPC_INVOKE_CHANNELS = Object.freeze(
+  Object.values(IPC_CHANNELS).filter((channel) => ![IPC_CHANNELS.importProgress, IPC_CHANNELS.libraryThumbnailsUpdated].includes(channel)),
+)
+
+const IPC_EVENT_CHANNELS = Object.freeze([IPC_CHANNELS.importProgress, IPC_CHANNELS.libraryThumbnailsUpdated])
+
+module.exports = {
+  IPC_CHANNELS,
+  IPC_EVENT_CHANNELS,
+  IPC_INVOKE_CHANNELS,
+}

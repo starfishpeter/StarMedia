@@ -1,0 +1,215 @@
+const test = require('node:test')
+const assert = require('node:assert/strict')
+const fs = require('node:fs')
+const fsPromises = require('node:fs/promises')
+const Module = require('node:module')
+const os = require('node:os')
+const path = require('node:path')
+const { pathToFileURL } = require('node:url')
+const { IPC_CHANNELS, IPC_INVOKE_CHANNELS } = require('./ipc-channels.cjs')
+
+function loadMainWithElectronMock(t) {
+  const workspaceRoot = path.resolve(__dirname, '..')
+  const dataRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'starmedia-main-ipc-test-'))
+  const handlers = new Map()
+  const windows = []
+  class BrowserWindow {
+    constructor(options) {
+      this.options = options
+      this.destroyed = false
+      this.closed = false
+      this.maximized = false
+      this.minimized = false
+      this.webContents = {
+        isDestroyed: () => false,
+        mainFrame: { url: pathToFileURL(path.join(workspaceRoot, 'dist', 'index.html')).toString() },
+        send: () => {},
+        setWindowOpenHandler: () => {},
+        on: () => {},
+      }
+      windows.push(this)
+    }
+
+    static getAllWindows() {
+      return windows
+    }
+
+    static fromWebContents(webContents) {
+      return windows.find((window) => window.webContents === webContents) ?? null
+    }
+
+    isDestroyed() {
+      return this.destroyed
+    }
+
+    isMinimized() {
+      return this.minimized
+    }
+
+    minimize() {
+      this.minimized = true
+    }
+
+    maximize() {
+      this.maximized = true
+    }
+
+    unmaximize() {
+      this.maximized = false
+    }
+
+    isMaximized() {
+      return this.maximized
+    }
+
+    show() {}
+    focus() {}
+    restore() {}
+    on() {}
+    loadFile() {}
+    loadURL() {}
+    close() {
+      this.closed = true
+    }
+  }
+  const electron = {
+    app: {
+      isPackaged: true,
+      setPath: () => {},
+      getPath: () => dataRoot,
+      getVersion: () => 'test',
+      getAppPath: () => workspaceRoot,
+      on: () => {},
+      quit: () => {},
+      whenReady: async () => {},
+      setName: () => {},
+      setAppUserModelId: () => {},
+    },
+    BrowserWindow,
+    Menu: { setApplicationMenu: () => {} },
+    dialog: {
+      showSaveDialog: async () => ({ canceled: true }),
+      showOpenDialog: async () => ({ canceled: true, filePaths: [] }),
+      showMessageBox: async () => ({}),
+    },
+    ipcMain: { handle: (channel, listener) => handlers.set(channel, listener) },
+    net: { fetch: async () => new Response('') },
+    shell: { trashItem: async () => {}, openPath: async () => '', openExternal: async () => '' },
+  }
+  const mainPath = path.join(workspaceRoot, 'electron', 'main.cjs')
+  const originalLoad = Module._load
+  Module._load = function load(request, parent, isMain) {
+    if (request === 'electron') return electron
+    return originalLoad.call(this, request, parent, isMain)
+  }
+  delete require.cache[mainPath]
+  let main
+  try {
+    main = require(mainPath)
+  } finally {
+    Module._load = originalLoad
+  }
+  t.after(() => {
+    delete require.cache[mainPath]
+    return fsPromises.rm(dataRoot, { recursive: true, force: true })
+  })
+  return { handlers, main, windows }
+}
+
+test('registers every declared IPC handler and rejects untrusted senders before parsing requests', async (t) => {
+  const { handlers, main, windows } = loadMainWithElectronMock(t)
+  main.createWindow()
+  main.registerIpc()
+
+  assert.equal(windows[0].options.webPreferences.contextIsolation, true)
+  assert.equal(windows[0].options.webPreferences.nodeIntegration, false)
+  assert.equal(windows[0].options.webPreferences.sandbox, false)
+  assert.deepEqual([...handlers.keys()].sort(), [...IPC_INVOKE_CHANNELS].sort())
+  for (const handler of handlers.values()) {
+    await assert.rejects(handler({}), /非受信任页面/)
+  }
+
+  const window = windows[0]
+  const event = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
+  await handlers.get(IPC_CHANNELS.windowMinimize)(event)
+  assert.equal(window.minimized, true)
+  assert.equal(await handlers.get(IPC_CHANNELS.windowToggleMaximize)(event), false)
+  assert.equal(await handlers.get(IPC_CHANNELS.windowToggleMaximize)(event), true)
+  await assert.rejects(handlers.get(IPC_CHANNELS.configSave)(event, {}), /IPC 请求无效/)
+  assert.equal(await handlers.get(IPC_CHANNELS.windowClose)(event), 'blocked')
+  assert.equal(window.closed, false)
+  const config = await handlers.get(IPC_CHANNELS.configLoad)(event)
+  config.config.confirmBeforeClose = false
+  await handlers.get(IPC_CHANNELS.configSave)(event, config.config)
+  assert.equal(await handlers.get(IPC_CHANNELS.windowClose)(event), 'closed')
+  assert.equal(window.closed, true)
+})
+
+test('uses legacy development data only when the current data root has no index', (t) => {
+  const { main } = loadMainWithElectronMock(t)
+  const appPath = path.join('C:', 'StarMedia')
+  const currentConfig = path.join(appPath, 'StarMediaData', 'starmedia-config.json')
+  const legacyLibrary = path.join(appPath, 'scripts', 'StarMediaData', 'starmedia-library.json')
+  const resolve = (existingPaths) =>
+    main.resolvePortableDataRoot({
+      development: true,
+      appPath,
+      executablePath: path.join(appPath, 'StarMedia.exe'),
+      pathExists: (candidate) => existingPaths.has(candidate),
+    })
+
+  assert.equal(resolve(new Set([legacyLibrary])), path.join(appPath, 'scripts', 'StarMediaData'))
+  assert.equal(resolve(new Set([legacyLibrary, currentConfig])), path.join(appPath, 'StarMediaData'))
+  assert.equal(
+    main.resolvePortableDataRoot({
+      development: false,
+      appPath,
+      executablePath: path.join('D:', 'Portable', 'StarMedia.exe'),
+      pathExists: () => false,
+    }),
+    path.join('D:', 'Portable', 'StarMediaData'),
+  )
+})
+
+test('creates import plans through trusted IPC without treating missing sources as ready items', async (t) => {
+  const { handlers, main, windows } = loadMainWithElectronMock(t)
+  main.createWindow()
+  main.registerIpc()
+  const window = windows[0]
+  const event = { sender: window.webContents, senderFrame: window.webContents.mainFrame }
+  const config = await main.loadConfig()
+  const mediaRoot = path.join(os.tmpdir(), `starmedia-main-import-media-${Date.now()}`)
+  const libraryRoot = path.join(mediaRoot, 'general')
+  const sourcePath = path.join(mediaRoot, 'source', 'episode.mp4')
+  t.after(() => fsPromises.rm(mediaRoot, { recursive: true, force: true }))
+  await fsPromises.mkdir(path.dirname(sourcePath), { recursive: true })
+  await fsPromises.writeFile(sourcePath, 'video')
+  config.mediaRoot = mediaRoot
+  config.libraries.general.rootPath = libraryRoot
+  await handlers.get(IPC_CHANNELS.configSave)(event, config)
+
+  const plan = await handlers.get(IPC_CHANNELS.importCreatePlan)(event, { sourcePaths: [sourcePath], targetLibrary: 'general' })
+  assert.equal(plan.acceptedCount, 1)
+  assert.equal(plan.items[0].status, 'ready')
+  assert.equal(plan.items[0].targetPath, path.join(libraryRoot, 'episode', 'episode.mp4'))
+
+  const missingPlan = await handlers.get(IPC_CHANNELS.importCreatePlan)(event, {
+    sourcePaths: [path.join(mediaRoot, 'source', 'missing.mp4')],
+    targetLibrary: 'general',
+  })
+  assert.equal(missingPlan.acceptedCount, 0)
+  assert.deepEqual(missingPlan.items, [])
+  assert.equal(missingPlan.errorCount, 1)
+
+  const managedSource = path.join(libraryRoot, 'Existing Series', 'managed.mp4')
+  await fsPromises.mkdir(path.dirname(managedSource), { recursive: true })
+  await fsPromises.writeFile(managedSource, 'video')
+  const managedPlan = await handlers.get(IPC_CHANNELS.importCreatePlan)(event, {
+    sourcePaths: [managedSource],
+    targetLibrary: 'auto',
+  })
+  assert.equal(managedPlan.acceptedCount, 1)
+  assert.equal(managedPlan.items[0].library, 'general')
+  assert.equal(managedPlan.items[0].affiliation, 'Existing Series')
+  assert.equal(managedPlan.items[0].targetPath, managedSource)
+})

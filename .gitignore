@@ -1,0 +1,32 @@
+# Dependencies and generated output
+node_modules/
+dist/
+release/
+coverage/
+*.tsbuildinfo
+
+# StarMedia user data (may contain media paths, metadata and access tokens)
+/StarMediaData/
+/scripts/StarMediaData/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.local
+
+# Logs and temporary files
+*.log
+*.tmp
+*.temp
+.cache/
+.tmp/
+tmp/
+
+# Editors, local tooling and operating-system files
+/.codex/
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+Desktop.ini
