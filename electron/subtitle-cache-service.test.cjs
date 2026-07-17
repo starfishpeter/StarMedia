@@ -3,6 +3,7 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
+const { fileURLToPath } = require('node:url')
 const { convertAssToWebVtt, convertSrtToWebVtt, createSubtitlePlaybackTracks } = require('./subtitle-cache-service.cjs')
 
 async function createSandbox(t) {
@@ -21,7 +22,7 @@ test('converts SRT and ASS subtitles into WebVTT cues', () => {
 
 test('caches converted tracks, preserves native VTT files, and protects active cache files while pruning', async (t) => {
   const root = await createSandbox(t)
-  const cacheDir = path.join(root, 'cache')
+  const cacheDir = path.join(root, 'cache~encoded')
   const srtPath = path.join(root, 'episode.zh.srt')
   const vttPath = path.join(root, 'episode.en.vtt')
   await fs.writeFile(srtPath, '1\n00:00:01,000 --> 00:00:02,000\n你好')
@@ -40,10 +41,10 @@ test('caches converted tracks, preserves native VTT files, and protects active c
   })
 
   assert.equal(tracks.length, 2)
-  assert.match(tracks[0].url, /cache[\\/]subtitles/)
-  assert.match(tracks[1].url, /episode\.en\.vtt$/)
+  const cachePath = fileURLToPath(tracks[0].url)
+  assert.match(cachePath, /cache~encoded[\\/]subtitles/)
+  assert.match(fileURLToPath(tracks[1].url), /episode\.en\.vtt$/)
   assert.deepEqual(touched, pruned)
-  const cachePath = new URL(tracks[0].url).pathname.slice(1).replaceAll('/', path.sep)
   assert.match(await fs.readFile(cachePath, 'utf8'), /00:00:01\.000/)
 })
 
@@ -72,7 +73,7 @@ test('skips unreadable subtitle files without preventing the video from receivin
 
 test('converts embedded ASS content and protects its extraction manifest while pruning', async (t) => {
   const root = await createSandbox(t)
-  const cacheDir = path.join(root, 'cache')
+  const cacheDir = path.join(root, 'cache~encoded')
   const manifestPath = path.join(cacheDir, 'subtitles', 'embedded', 'track.json')
   await fs.mkdir(path.dirname(manifestPath), { recursive: true })
   await fs.writeFile(manifestPath, '{}')
@@ -101,6 +102,6 @@ test('converts embedded ASS content and protects its extraction manifest while p
     protectedPaths.some((filePath) => filePath.endsWith('.vtt')),
     true,
   )
-  const vttPath = new URL(tracks[0].url).pathname.slice(1).replaceAll('/', path.sep)
+  const vttPath = fileURLToPath(tracks[0].url)
   assert.match(await fs.readFile(vttPath, 'utf8'), /内嵌字幕/)
 })
