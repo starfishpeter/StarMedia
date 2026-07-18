@@ -37,6 +37,7 @@ function createPreloadBridge({ invoke, subscribe, getPathForFile }) {
     openVideoExternally: (id) => call(IPC_CHANNELS.videoOpenExternal, id),
     updateVideoMetadata: (input) => call(IPC_CHANNELS.videoUpdateMetadata, input),
     updateContainerTags: (input) => call(IPC_CHANNELS.libraryUpdateContainerTags, input),
+    updateMediaTags: (input) => call(IPC_CHANNELS.libraryUpdateMediaTags, input),
     updateContainerInfo: (input) => call(IPC_CHANNELS.libraryUpdateContainerInfo, input),
     updateMediaInfo: (input) => call(IPC_CHANNELS.libraryUpdateMediaInfo, input),
     updateVideoEpisode: (input) => call(IPC_CHANNELS.libraryUpdateVideoEpisode, input),
@@ -61,6 +62,7 @@ function createPreloadBridge({ invoke, subscribe, getPathForFile }) {
     closeWindow: () => call(IPC_CHANNELS.windowClose),
     chooseDirectory: () => call(IPC_CHANNELS.dialogChooseDirectory),
     chooseImportSources: () => call(IPC_CHANNELS.dialogChooseImportSources),
+    chooseVideoFile: () => call(IPC_CHANNELS.dialogChooseVideoFile),
     getPathForFile,
   }
 }

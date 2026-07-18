@@ -50,6 +50,7 @@ export function DetailPanel({
 }) {
   const library = libraryById[item.library]
   const isBook = item.kind === 'book'
+  const usesPerVideoMetadata = item.library === 'creator' || item.library === 'general'
   const itemEpisode = getMediaEpisode(item)
   const [videoPlaybackAvailability, setVideoPlaybackAvailability] = useState<VideoPlaybackAvailability>('checking')
   const [editing, setEditing] = useState(false)
@@ -318,7 +319,7 @@ export function DetailPanel({
           {item.sidecars && item.sidecars.length > 0 && <p className="detail-sidecars">已关联 {item.sidecars.length} 个字幕文件</p>}
           <TagEditor
             className="detail-tags"
-            label={`标签（作用于整个${isBook ? '书架' : '合集'}）`}
+            label={usesPerVideoMetadata ? '标签' : `标签（作用于整个${isBook ? '书架' : '合集'}）`}
             tags={item.tags}
             availableTags={availableTags}
             onChange={(tags) => onUpdateTags(item, tags)}

@@ -3,6 +3,69 @@ import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
 import type { MediaItem } from '../data'
 
 export type VideoPlayerStatus = 'idle' | 'loading' | 'ready' | 'error'
+type SubtitleTrack = { format: 'ass' | 'vtt'; url: string; label: string }
+
+type AssRenderer = { dispose: () => void }
+type AssRendererConstructor = new (options: {
+  video: HTMLVideoElement
+  subUrl: string
+  workerUrl: string
+  fonts: string[]
+  renderMode: 'wasm-blend'
+  fallbackFont: string
+  onError: (error: unknown) => void
+}) => AssRenderer
+
+declare global {
+  interface Window {
+    SubtitlesOctopus?: AssRendererConstructor
+  }
+}
+
+let assFontLoader: Promise<string[]> | null = null
+let assRendererLoader: Promise<AssRendererConstructor> | null = null
+
+function getLibassAssetUrl(name: string) {
+  return new URL(`libass/${name}`, window.location.href).toString()
+}
+
+function loadAssFonts() {
+  if (!assFontLoader) {
+    assFontLoader = fetch(getLibassAssetUrl('fonts/noto-sans-cjk-sc-fonts.json'))
+      .then((response) => {
+        if (!response.ok) throw new Error('无法读取内置中文字幕字体。')
+        return response.json()
+      })
+      .then((files: unknown) => {
+        if (!Array.isArray(files) || files.length !== 1 || files.some((file) => typeof file !== 'string' || !file.endsWith('.otf')))
+          throw new Error('内置中文字幕字体清单无效。')
+        return files.map((file) => getLibassAssetUrl(`fonts/${file}`))
+      })
+  }
+  return assFontLoader
+}
+
+function getAssRenderer() {
+  if (window.SubtitlesOctopus) return Promise.resolve(window.SubtitlesOctopus)
+  if (!assRendererLoader) {
+    assRendererLoader = new Promise((resolve, reject) => {
+      const script = document.createElement('script')
+      script.src = getLibassAssetUrl('subtitles-octopus.js')
+      script.async = true
+      script.onload = () => {
+        if (window.SubtitlesOctopus) resolve(window.SubtitlesOctopus)
+        else reject(new Error('libass 字幕渲染器未加载。'))
+      }
+      script.onerror = () => {
+        assRendererLoader = null
+        script.remove()
+        reject(new Error('无法加载 libass 字幕渲染器。'))
+      }
+      document.head.append(script)
+    })
+  }
+  return assRendererLoader
+}
 
 export function VideoPlayer({
   item,
@@ -19,7 +82,7 @@ export function VideoPlayer({
   item: MediaItem
   sourceUrl: string
   mimeType: string
-  subtitles: Array<{ url: string; label: string }>
+  subtitles: SubtitleTrack[]
   status: VideoPlayerStatus
   errorMessage: string
   onClose: () => void
@@ -28,9 +91,12 @@ export function VideoPlayer({
   onFeedback: (message: string) => void
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const assRendererRef = useRef<AssRenderer | null>(null)
+  const feedbackRef = useRef(onFeedback)
   const metadataSavedRef = useRef(false)
   const longPressTimerRef = useRef<number | null>(null)
   const longPressActiveRef = useRef(false)
+  const longPressPointerIdRef = useRef<number | null>(null)
   const suppressVideoClickRef = useRef(false)
   const selectedRateRef = useRef(1)
   const [playbackError, setPlaybackError] = useState(false)
@@ -45,6 +111,7 @@ export function VideoPlayer({
   const [showControls, setShowControls] = useState(true)
   const controlsTimerRef = useRef<number | null>(null)
   const canSetFrameCover = item.kind === 'video'
+  feedbackRef.current = onFeedback
   const resetPlayback = useEffectEvent(() => {
     metadataSavedRef.current = false
     setPlaybackError(false)
@@ -64,6 +131,9 @@ export function VideoPlayer({
     () => () => {
       if (longPressTimerRef.current !== null) window.clearTimeout(longPressTimerRef.current)
       if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current)
+      const pointerId = longPressPointerIdRef.current
+      const video = videoRef.current
+      if (pointerId !== null && video?.hasPointerCapture?.(pointerId)) video.releasePointerCapture(pointerId)
     },
     [],
   )
@@ -145,13 +215,45 @@ export function VideoPlayer({
   function syncSubtitleTracks(value = selectedSubtitle) {
     const tracks = videoRef.current?.textTracks
     if (!tracks) return
-    for (let index = 0; index < tracks.length; index += 1) tracks[index].mode = subtitles[index]?.url === value ? 'showing' : 'disabled'
+    const nativeSubtitles = subtitles.filter((subtitle) => subtitle.format === 'vtt')
+    for (let index = 0; index < tracks.length; index += 1)
+      tracks[index].mode = nativeSubtitles[index]?.url === value ? 'showing' : 'disabled'
   }
 
   const synchronizeSubtitleTracks = useEffectEvent((value: string) => syncSubtitleTracks(value))
 
   useEffect(() => {
     synchronizeSubtitleTracks(selectedSubtitle)
+  }, [selectedSubtitle, subtitles])
+
+  useEffect(() => {
+    assRendererRef.current?.dispose()
+    assRendererRef.current = null
+    const subtitle = subtitles.find((candidate) => candidate.url === selectedSubtitle && candidate.format === 'ass')
+    const video = videoRef.current
+    if (!subtitle || !video) return undefined
+    let cancelled = false
+    void Promise.all([getAssRenderer(), loadAssFonts()])
+      .then(([SubtitlesOctopus, fonts]) => {
+        if (cancelled || !videoRef.current || videoRef.current !== video) return
+        assRendererRef.current = new SubtitlesOctopus({
+          video,
+          subUrl: subtitle.url,
+          workerUrl: getLibassAssetUrl('subtitles-octopus-worker.js'),
+          fonts,
+          renderMode: 'wasm-blend',
+          fallbackFont: fonts[0],
+          onError: (error) => feedbackRef.current(`ASS 字幕渲染失败：${error instanceof Error ? error.message : String(error)}`),
+        })
+      })
+      .catch((error) => {
+        if (!cancelled) feedbackRef.current(error instanceof Error ? error.message : '无法加载 ASS 字幕渲染器。')
+      })
+    return () => {
+      cancelled = true
+      assRendererRef.current?.dispose()
+      assRendererRef.current = null
+    }
   }, [selectedSubtitle, subtitles])
 
   function togglePlayback() {
@@ -190,6 +292,7 @@ export function VideoPlayer({
     if (event.button !== 0) return
     if (longPressTimerRef.current !== null) window.clearTimeout(longPressTimerRef.current)
     event.currentTarget.setPointerCapture?.(event.pointerId)
+    longPressPointerIdRef.current = event.pointerId
     longPressActiveRef.current = false
     longPressTimerRef.current = window.setTimeout(() => {
       longPressActiveRef.current = true
@@ -207,15 +310,25 @@ export function VideoPlayer({
       longPressActiveRef.current = false
       applyPlaybackRate(selectedRateRef.current, false)
     }
-    if (event?.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    const pointerId = event?.pointerId ?? longPressPointerIdRef.current
+    const video = event?.currentTarget ?? videoRef.current
+    if (pointerId !== null && video?.hasPointerCapture?.(pointerId)) video.releasePointerCapture(pointerId)
+    longPressPointerIdRef.current = null
     if (suppressVideoClickRef.current)
       window.setTimeout(() => {
         suppressVideoClickRef.current = false
       }, 0)
   }
 
+  const cancelLongPress = useEffectEvent(() => stopLongPressSpeed())
+
+  useEffect(() => {
+    window.addEventListener('blur', cancelLongPress)
+    return () => window.removeEventListener('blur', cancelLongPress)
+  }, [])
+
   function requestFullscreen() {
-    void videoRef.current?.requestFullscreen?.()
+    void videoRef.current?.closest('.video-canvas')?.requestFullscreen?.()
   }
 
   function captureMetadata(saveThumbnail = false) {
@@ -329,20 +442,23 @@ export function VideoPlayer({
                 onPointerDown={startLongPressSpeed}
                 onPointerUp={stopLongPressSpeed}
                 onPointerCancel={stopLongPressSpeed}
+                onLostPointerCapture={stopLongPressSpeed}
               >
                 <source src={sourceUrl} type={mimeType || undefined} />
-                {subtitles.map((subtitle, index) => (
-                  <track
-                    key={subtitle.url}
-                    kind="subtitles"
-                    src={subtitle.url}
-                    srcLang="zh"
-                    label={subtitle.label}
-                    default={index === 0}
-                    onLoad={() => syncSubtitleTracks(selectedSubtitle)}
-                    onError={() => onFeedback(`字幕「${subtitle.label}」加载失败。`)}
-                  />
-                ))}
+                {subtitles
+                  .filter((subtitle) => subtitle.format === 'vtt')
+                  .map((subtitle, index) => (
+                    <track
+                      key={subtitle.url}
+                      kind="subtitles"
+                      src={subtitle.url}
+                      srcLang="zh"
+                      label={subtitle.label}
+                      default={index === 0}
+                      onLoad={() => syncSubtitleTracks(selectedSubtitle)}
+                      onError={() => onFeedback(`字幕「${subtitle.label}」加载失败。`)}
+                    />
+                  ))}
               </video>
             </div>
           </div>

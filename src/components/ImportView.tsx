@@ -1,5 +1,5 @@
 import { AlertTriangle, Database, FolderInput, FolderOpen, Search, UploadCloud } from 'lucide-react'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useEffectEvent, useMemo, useRef, useState } from 'react'
 import { libraries, libraryById, type LibraryId } from '../data'
 import { isArchiveLibrary } from '../domain/media'
 
@@ -240,6 +240,23 @@ function ImportPlanPreview({
     if (!batchLibraries.some((library) => library.id === batchLibrary)) setBatchLibrary(batchLibraries[0].id)
   }, [batchLibraries, batchLibrary])
 
+  const cancelPlanDragSelection = useEffectEvent(() => {
+    const state = planDragStateRef.current
+    if (!state) return
+    planDragStateRef.current = null
+    setSelectionBox(null)
+    const root = planTableRef.current
+    if (root?.hasPointerCapture?.(state.pointerId)) root.releasePointerCapture(state.pointerId)
+  })
+
+  useEffect(() => {
+    window.addEventListener('blur', cancelPlanDragSelection)
+    return () => {
+      window.removeEventListener('blur', cancelPlanDragSelection)
+      cancelPlanDragSelection()
+    }
+  }, [])
+
   function toggleItemSelection(itemId: string, useRange = false) {
     if (useRange && selectionAnchorId) {
       const start = selectablePlanItems.findIndex((item) => item.id === selectionAnchorId)
@@ -305,7 +322,7 @@ function ImportPlanPreview({
     }
   }
 
-  function finishPlanDragSelection(event: React.PointerEvent<HTMLDivElement>) {
+  function finishPlanDragSelection(event?: React.PointerEvent<HTMLDivElement>) {
     const state = planDragStateRef.current
     if (!state) return
     if (state.active) {
@@ -316,7 +333,8 @@ function ImportPlanPreview({
     }
     planDragStateRef.current = null
     setSelectionBox(null)
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    const root = event?.currentTarget ?? planTableRef.current
+    if (root?.hasPointerCapture?.(state.pointerId)) root.releasePointerCapture(state.pointerId)
   }
 
   function applyBatchLibrary() {

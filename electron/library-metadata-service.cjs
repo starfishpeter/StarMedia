@@ -127,6 +127,7 @@ function createLibraryMetadataService({
     const index = library.items.findIndex((item) => item?.id === input.id)
     if (index < 0) throw new Error('媒体记录不存在')
     const selected = library.items[index]
+    if (hasTags && (selected.library === 'creator' || selected.library === 'general')) throw new Error('原创和综合合集不支持统一标签')
     const isSameContainer = (item) =>
       item?.library === selected.library &&
       item?.kind === selected.kind &&
@@ -208,6 +209,20 @@ function createLibraryMetadataService({
       ...(input.creator !== undefined ? { creator: input.creator.trim().slice(0, 200) } : {}),
       ...(input.releaseDate !== undefined ? { releaseDate: input.releaseDate.trim().slice(0, 40) } : {}),
     }
+    const saved = await saveLibrary({ items, operations: library.operations }, { backupExisting: false })
+    return { ...saved, item: saved.data.items[index] }
+  }
+
+  async function updateMediaTags(input) {
+    const config = await loadConfig()
+    const allowedTags = new Set(config.catalog.tags)
+    const tags = [...new Set(input.tags.map((tag) => String(tag).trim()).filter(Boolean))]
+    if (tags.some((tag) => !allowedTags.has(tag))) throw new Error('包含未在标签管理中保存的标签')
+    const library = await loadLibrary()
+    const index = library.items.findIndex((item) => item?.id === input.id)
+    if (index < 0) throw new Error('媒体记录不存在')
+    const items = [...library.items]
+    items[index] = { ...items[index], tags }
     const saved = await saveLibrary({ items, operations: library.operations }, { backupExisting: false })
     return { ...saved, item: saved.data.items[index] }
   }
@@ -393,6 +408,7 @@ function createLibraryMetadataService({
     updateContainerInfo,
     updateContainerTags: updateContainerInfo,
     updateMediaInfo,
+    updateMediaTags,
     updateVideoEpisode,
     updateVideoMetadata,
   }

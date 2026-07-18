@@ -119,7 +119,14 @@ async function verifyPortableApplication(rootDirectory) {
     path.join(applicationRoot, 'electron', 'local-update-launcher.vbs'),
     path.join(applicationRoot, 'electron', 'local-update-runner.ps1'),
     path.join(applicationRoot, 'dist', 'index.html'),
+    path.join(applicationRoot, 'dist', 'libass', 'subtitles-octopus.js'),
+    path.join(applicationRoot, 'dist', 'libass', 'subtitles-octopus-worker.js'),
+    path.join(applicationRoot, 'dist', 'libass', 'subtitles-octopus-worker.wasm'),
+    path.join(applicationRoot, 'dist', 'libass', 'fonts', 'noto-sans-cjk-sc-fonts.json'),
+    path.join(applicationRoot, 'dist', 'libass', 'fonts', 'Noto-Sans-CJK-SC-OFL.txt'),
+    path.join(applicationRoot, 'dist', 'libass', 'fonts', 'NotoSansCJKsc-Regular.otf'),
     path.join(applicationRoot, 'node_modules', '7zip-bin', 'index.js'),
+    path.join(applicationRoot, 'node_modules', 'libass-wasm', 'dist', 'js', 'subtitles-octopus.js'),
     path.join(applicationRoot, 'node_modules', 'yauzl', 'index.js'),
     path.join(applicationRoot, 'node_modules', 'pend', 'index.js'),
   ]
@@ -160,7 +167,7 @@ async function packagePortableApplication() {
   await copyDirectory(path.join(workspaceRoot, 'src', 'assets'), path.join(applicationRoot, 'src', 'assets'))
   await fs.copyFile(path.join(workspaceRoot, 'package.json'), path.join(applicationRoot, 'package.json'))
 
-  const runtimeModules = ['7zip-bin', 'yauzl', 'pend']
+  const runtimeModules = ['7zip-bin', 'libass-wasm', 'yauzl', 'pend']
   for (const moduleName of runtimeModules) {
     await copyDirectory(path.join(workspaceRoot, 'node_modules', moduleName), path.join(applicationRoot, 'node_modules', moduleName))
   }

@@ -58,7 +58,14 @@ test('sanitizes configuration values and migrates legacy classifications', async
     theme: 'unsupported',
     cacheLimitMb: 4,
     network: { proxyEnabled: true, proxyUrl: ' 127.0.0.1:8390 ' },
-    scraping: { bangumiToken: ' token ', bangumiEndpoint: ' https://example.test ', hanime1Endpoint: ' ' },
+    scraping: {
+      anidbClient: ' obsolete-client ',
+      anidbClientVersion: ' 2 ',
+      anidbEndpoint: ' http://anidb.example:9001/httpapi ',
+      bangumiToken: ' token ',
+      bangumiEndpoint: ' https://example.test ',
+      hanime1Endpoint: ' ',
+    },
     vocabularies: {
       tags: [' 动作 ', '动作', '科幻'],
       animeCategories: ['番剧', '未分类'],
@@ -79,6 +86,7 @@ test('sanitizes configuration values and migrates legacy classifications', async
   assert.equal(config.theme, 'dark')
   assert.equal(config.cacheLimitMb, 128)
   assert.equal(config.scraping.bangumiToken, 'token')
+  assert.equal('anidbClient' in config.scraping, false)
   assert.equal(config.scraping.bangumiEndpoint, 'https://example.test')
   assert.equal(config.scraping.hanime1Endpoint, 'https://hanime1.com')
   assert.deepEqual(config.network, { proxyEnabled: true, proxyUrl: 'http://127.0.0.1:8390' })

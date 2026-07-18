@@ -88,4 +88,7 @@ test('IPC request contracts return normalized safe request shapes', () => {
   ])
 
   assert.deepEqual(request, { ids: ['video:anime:item'], targetLibrary: 'general' })
+
+  const [tagRequest] = parseIpcRequest(IPC_CHANNELS.libraryUpdateMediaTags, [{ id: 'video:creator:item', tags: [' 单集标签 '] }])
+  assert.deepEqual(tagRequest, { id: 'video:creator:item', tags: ['单集标签'] })
 })

@@ -11,6 +11,7 @@ type ScrapeDraftValues = Required<StarMediaScrapeFields>
 type ScrapeWritableField = Exclude<keyof ScrapeDraftValues, 'releaseDate'>
 type ScrapeApplyTarget = ScrapeWritableField | 'all'
 type EpisodeSortMode = 'episode' | 'title-asc' | 'title-desc'
+type ScraperSource = 'bangumi' | 'freeanimehentai' | 'hanime1'
 
 const emptyScrapeDraftValues: ScrapeDraftValues = {
   cover: false,
@@ -86,6 +87,7 @@ export function ContainerOverview({
           }
       : (left, right) => left.title.localeCompare(right.title, 'zh-CN', { numeric: true }),
   )
+  const coverItem = kind === 'affiliation' ? [...items].sort(compareMediaEpisodes)[0] : orderedItems[0]
   const [draftNote, setDraftNote] = useState(representative?.note ?? '')
   const [draftMetadata, setDraftMetadata] = useState<ContainerMetadata>({
     name,
@@ -93,7 +95,7 @@ export function ContainerOverview({
     studio: representative?.studio ?? '',
     firstAiredAt: representative?.firstAiredAt ?? '',
   })
-  const [scraperSource, setScraperSource] = useState<'bangumi' | 'freeanimehentai' | 'hanime1'>('bangumi')
+  const [scraperSource, setScraperSource] = useState<ScraperSource>('bangumi')
   const [scraperQuery, setScraperQuery] = useState(representative?.originalTitle?.trim() || name)
   const [bangumiId, setBangumiId] = useState(
     representative?.bangumiId ?? (representative?.scraperSource === 'Bangumi' ? (representative.scraperId ?? '') : ''),
@@ -165,8 +167,11 @@ export function ContainerOverview({
   const entryLabel = kind === 'affiliation' ? '选集' : '本'
   const usesPosterCover = kind === 'affiliation' && (representative.library === 'erAnime' || representative.library === 'anime')
   const isCreatorContainer = kind === 'affiliation' && representative.library === 'creator'
+  const usesPerVideoMetadata = isCreatorContainer || representative.library === 'general'
   const canEditMetadata = Boolean(onSaveMetadata)
+  const canUseBangumi = Boolean(onSearchBangumi && onPreviewBangumi && onApplyBangumi)
   const canUseHanime = kind === 'affiliation' && representative.library === 'erAnime' && Boolean(onSearchHanime && onApplyHanime)
+  const canUseScraper = usesPosterCover && (canUseBangumi || canUseHanime)
 
   async function searchSelectedSource(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -178,9 +183,11 @@ export function ContainerOverview({
       if (scraperSource === 'bangumi' && onSearchBangumi) {
         setBangumiSubjects(await onSearchBangumi(scraperQuery.trim()))
         setHanimeSubjects([])
-      } else if (scraperSource !== 'bangumi' && onSearchHanime) {
+      } else if ((scraperSource === 'freeanimehentai' || scraperSource === 'hanime1') && onSearchHanime) {
         setHanimeSubjects(await onSearchHanime(scraperQuery.trim(), scraperSource))
         setBangumiSubjects([])
+      } else {
+        throw new Error('当前运行环境不支持此刮削来源。')
       }
     } catch (error) {
       setBangumiSubjects([])
@@ -195,7 +202,7 @@ export function ContainerOverview({
     }
   }
 
-  async function prepareScrapePreview(source: 'bangumi' | 'freeanimehentai' | 'hanime1', subjectId: number) {
+  async function prepareScrapePreview(source: ScraperSource, subjectId: number) {
     const previewLoader =
       source === 'bangumi'
         ? onPreviewBangumi && (() => onPreviewBangumi(subjectId))
@@ -235,7 +242,7 @@ export function ContainerOverview({
       if (scrapePreview.source === 'bangumi' && onApplyBangumi) {
         await onApplyBangumi(representative, scrapePreview.subjectId, fields)
         setBangumiId(String(scrapePreview.subjectId))
-      } else if (scrapePreview.source !== 'bangumi' && onApplyHanime) {
+      } else if ((scrapePreview.source === 'freeanimehentai' || scrapePreview.source === 'hanime1') && onApplyHanime) {
         await onApplyHanime(representative, scrapePreview.subjectId, scrapePreview.source, fields)
         if (scrapePreview.source === 'hanime1') setHanime1Id(String(scrapePreview.subjectId))
         else setFreeAnimeHentaiId(String(scrapePreview.subjectId))
@@ -303,7 +310,7 @@ export function ContainerOverview({
     setScraperSuccess('')
   }
 
-  function selectScraperSource(source: 'bangumi' | 'freeanimehentai' | 'hanime1') {
+  function selectScraperSource(source: ScraperSource) {
     if (source === scraperSource) return
     setScraperSource(source)
     setBangumiSubjects([])
@@ -337,13 +344,13 @@ export function ContainerOverview({
       <article
         className={`collection-hero ${usesPosterCover ? 'poster-collection' : 'video-collection'} ${isCreatorContainer ? 'creator-collection' : ''}`}
       >
-        {!isCreatorContainer && <div className="collection-backdrop" style={{ background: representative.cover } as CSSProperties} />}
+        <div className="collection-backdrop" style={{ background: coverItem?.cover ?? representative.cover } as CSSProperties} />
         <div className="collection-hero-content">
           <div
-            className={`collection-poster ${usesPosterCover ? 'poster-cover' : ''} ${isCreatorContainer ? 'creator-cover-placeholder' : ''}`}
-            style={isCreatorContainer ? undefined : ({ background: representative.cover } as CSSProperties)}
+            className={`collection-poster ${usesPosterCover ? 'poster-cover' : ''}`}
+            style={{ background: coverItem?.cover ?? representative.cover } as CSSProperties}
           >
-            {isCreatorContainer && <span className="creator-cover-label">创作者</span>}
+            <span className="cover-grain" />
           </div>
           <div className="collection-info">
             <h2>{name}</h2>
@@ -363,7 +370,7 @@ export function ContainerOverview({
               <button className="secondary-button" onClick={() => setEditingNote((current) => !current)}>
                 {editingNote ? '收起简介' : '编辑简介'}
               </button>
-              {usesPosterCover && onSearchBangumi && onPreviewBangumi && onApplyBangumi && (
+              {canUseScraper && (
                 <button className="secondary-button" onClick={() => setScraperOpen((current) => !current)}>
                   {scraperOpen ? '收起刮削' : '网络刮削'}
                 </button>
@@ -469,17 +476,19 @@ export function ContainerOverview({
                 </button>
               </div>
             )}
-            <TagEditor
-              className="container-tag-editor"
-              tags={representative.tags ?? []}
-              availableTags={availableTags}
-              onChange={(tags) => onSaveTags(representative, tags)}
-              onAddTag={onAddTag ? (tag) => onAddTag(representative, tag) : undefined}
-            />
+            {!usesPerVideoMetadata && (
+              <TagEditor
+                className="container-tag-editor"
+                tags={representative.tags ?? []}
+                availableTags={availableTags}
+                onChange={(tags) => onSaveTags(representative, tags)}
+                onAddTag={onAddTag ? (tag) => onAddTag(representative, tag) : undefined}
+              />
+            )}
           </div>
         </div>
       </article>
-      {usesPosterCover && onSearchBangumi && onPreviewBangumi && onApplyBangumi && scraperOpen && (
+      {canUseScraper && scraperOpen && (
         <section className="scraper-panel collection-scraper-panel">
           <div className="scraper-panel-heading">
             <strong>网络刮削</strong>
@@ -488,13 +497,15 @@ export function ContainerOverview({
             </button>
           </div>
           <div className="scraper-source-switcher" role="tablist" aria-label="刮削来源">
-            <button
-              className={scraperSource === 'bangumi' ? 'active' : ''}
-              disabled={scraperStatus !== 'idle'}
-              onClick={() => selectScraperSource('bangumi')}
-            >
-              Bangumi
-            </button>
+            {canUseBangumi && (
+              <button
+                className={scraperSource === 'bangumi' ? 'active' : ''}
+                disabled={scraperStatus !== 'idle'}
+                onClick={() => selectScraperSource('bangumi')}
+              >
+                Bangumi
+              </button>
+            )}
             {canUseHanime && (
               <>
                 <button
@@ -857,6 +868,23 @@ function EpisodeSelectionSurface({
   const suppressClickRef = useRef(false)
   const selectionAnchorRef = useRef<string | null>(null)
 
+  const cancelDragSelection = useEffectEvent(() => {
+    const state = dragStateRef.current
+    if (!state) return
+    dragStateRef.current = null
+    setSelectionBox(null)
+    const root = rootRef.current
+    if (root?.hasPointerCapture?.(state.pointerId)) root.releasePointerCapture(state.pointerId)
+  })
+
+  useEffect(() => {
+    window.addEventListener('blur', cancelDragSelection)
+    return () => {
+      window.removeEventListener('blur', cancelDragSelection)
+      cancelDragSelection()
+    }
+  }, [])
+
   function selectItem(item: MediaItem, useRange: boolean) {
     const anchorId = selectionAnchorRef.current
     if (useRange && anchorId && onSelectMany) {
@@ -914,7 +942,7 @@ function EpisodeSelectionSurface({
     }
   }
 
-  function finishDragSelection(event: PointerEvent<HTMLDivElement>) {
+  function finishDragSelection(event?: PointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current
     if (!state) return
     if (state.active) {
@@ -925,7 +953,8 @@ function EpisodeSelectionSurface({
     }
     dragStateRef.current = null
     setSelectionBox(null)
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    const root = event?.currentTarget ?? rootRef.current
+    if (root?.hasPointerCapture?.(state.pointerId)) root.releasePointerCapture(state.pointerId)
   }
 
   return (

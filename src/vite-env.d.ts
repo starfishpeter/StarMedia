@@ -82,7 +82,7 @@ interface StarMediaVideoPlayback {
   url: string
   mimeType: string
   title: string
-  subtitles: Array<{ url: string; label: string }>
+  subtitles: Array<{ format: 'ass' | 'vtt'; url: string; label: string }>
 }
 
 interface StarMediaExternalOpenResult {
@@ -284,6 +284,7 @@ interface Window {
       thumbnailDataUrl?: string
     }) => Promise<StarMediaLibraryResult & { item: import('./data').MediaItem }>
     updateContainerTags?: (input: { id: string; tags: string[] }) => Promise<StarMediaLibraryResult & { item: import('./data').MediaItem }>
+    updateMediaTags?: (input: { id: string; tags: string[] }) => Promise<StarMediaLibraryResult & { item: import('./data').MediaItem }>
     updateContainerInfo?: (input: {
       id: string
       tags?: string[]
@@ -375,6 +376,7 @@ interface Window {
     testNetworkProxy?: () => Promise<{ status: number }>
     chooseDirectory?: () => Promise<string | null>
     chooseImportSources?: () => Promise<string[]>
+    chooseVideoFile?: () => Promise<string | null>
     getPathForFile?: (file: File) => string
   }
 }

@@ -966,6 +966,7 @@ select:focus {
 .cover-grain {
   position: absolute;
   inset: 0;
+  pointer-events: none;
   opacity: 0.16;
   background-image: radial-gradient(rgba(255, 255, 255, 0.5) 0.6px, transparent 0.6px);
   background-size: 4px 4px;
@@ -1196,7 +1197,7 @@ select:focus {
   grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
 }
 .landscape-affiliation-wall {
-  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
 }
 .affiliation-card {
   min-width: 0;
@@ -1362,14 +1363,17 @@ select:focus {
 }
 
 .collection-poster {
+  position: relative;
   width: 210px;
   aspect-ratio: 530 / 761;
   align-self: start;
+  overflow: hidden;
   border: 1px solid var(--line-strong);
   border-radius: var(--radius-sm);
   background-position: center;
   background-size: cover;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.26);
+  isolation: isolate;
 }
 .collection-poster:not(.poster-cover) {
   aspect-ratio: 16 / 9;
@@ -2241,19 +2245,6 @@ select:focus {
 }
 .detail-metadata-editor input:focus {
   border-color: var(--accent);
-}
-.creator-cover-placeholder {
-  display: grid;
-  place-items: center;
-  color: var(--text-secondary);
-  border: 1px solid var(--accent-focus);
-  background:
-    radial-gradient(circle at 35% 25%, var(--accent-soft), transparent 32%), linear-gradient(145deg, #1a3446, #101b28 65%, #0a1018);
-}
-.creator-cover-label {
-  font-size: 14px;
-  font-weight: 700;
-  letter-spacing: 0.09em;
 }
 
 /* ── 16. MEDIA BATCH MENU ────────────────────────────────────────────────── */
@@ -3740,6 +3731,15 @@ select:focus {
   text-shadow:
     -1px -1px 0 rgba(0, 0, 0, 0.9),
     1px 1px 0 rgba(0, 0, 0, 0.9);
+}
+.libassjs-canvas-parent {
+  position: absolute !important;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+.libassjs-canvas {
+  pointer-events: none;
 }
 .video-controls {
   position: absolute;

@@ -76,3 +76,60 @@ test('deduplicates export warnings until the active dialog resolves', async () =
   releaseWarning({})
   await third
 })
+
+test('chooses one supported video file when replacing an episode', async () => {
+  const calls = []
+  const service = createService({
+    showOpenDialog: async (_owner, options) => {
+      calls.push(options)
+      return { canceled: false, filePaths: ['C:\\Media\\replacement.mkv'] }
+    },
+  })
+
+  assert.equal(await service.chooseVideoFile(), 'C:\\Media\\replacement.mkv')
+  assert.deepEqual(calls, [
+    {
+      title: '选择替换视频文件',
+      properties: ['openFile'],
+      filters: [
+        {
+          name: '支持的视频文件',
+          extensions: [
+            '3g2',
+            '3gp',
+            'asf',
+            'avi',
+            'divx',
+            'dv',
+            'f4v',
+            'flv',
+            'm2ts',
+            'm2v',
+            'm4v',
+            'mkv',
+            'mod',
+            'mov',
+            'mp4',
+            'mpe',
+            'mpeg',
+            'mpg',
+            'mts',
+            'mxf',
+            'ogv',
+            'qt',
+            'tod',
+            'ts',
+            'vob',
+            'webm',
+            'wmv',
+          ],
+        },
+      ],
+    },
+  ])
+})
+
+test('returns null when video replacement selection is canceled', async () => {
+  const service = createService({ showOpenDialog: async () => ({ canceled: true, filePaths: [] }) })
+  assert.equal(await service.chooseVideoFile(), null)
+})

@@ -1,5 +1,5 @@
 import { ArrowUpDown, Check, LibraryBig, Search, SlidersHorizontal } from 'lucide-react'
-import { Fragment, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
+import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { type LibraryDefinition, type MediaItem } from '../data'
 import {
   compareMediaEpisodes,
@@ -110,6 +110,7 @@ export function LibraryBrowser({
   shelfOverview: ReactNode
 }) {
   const showingContainer = Boolean(selectedAffiliation || selectedShelf)
+  const usesPerVideoMetadata = activeLibrary?.id === 'creator' || activeLibrary?.id === 'general'
   const sortDirectionOptions: BrowserOption[] =
     sortMode === 'title'
       ? [
@@ -138,23 +139,29 @@ export function LibraryBrowser({
     >
       {!showingContainer && (
         <div className="control-bar">
-          <div className="control-bar-group">
-            <BrowserControlSelect
-              icon={<SlidersHorizontal size={15} />}
-              label={activeLibrary?.primaryLabel ?? '分类'}
-              value={primaryFilter}
-              onChange={(value) => onBrowseStateChange({ primaryFilter: value })}
-              options={primaryOptions}
-            />
-            <BrowserControlSelect
-              icon={<Check size={15} />}
-              label="标签"
-              value={tagFilter}
-              onChange={(value) => onBrowseStateChange({ tagFilter: value })}
-              options={tagOptions}
-            />
-          </div>
-          <div className="control-bar-divider" />
+          {(!usesPerVideoMetadata || queryActive) && (
+            <>
+              <div className="control-bar-group">
+                {!usesPerVideoMetadata && (
+                  <BrowserControlSelect
+                    icon={<SlidersHorizontal size={15} />}
+                    label={activeLibrary?.primaryLabel ?? '分类'}
+                    value={primaryFilter}
+                    onChange={(value) => onBrowseStateChange({ primaryFilter: value })}
+                    options={primaryOptions}
+                  />
+                )}
+                <BrowserControlSelect
+                  icon={<Check size={15} />}
+                  label="标签"
+                  value={tagFilter}
+                  onChange={(value) => onBrowseStateChange({ tagFilter: value })}
+                  options={tagOptions}
+                />
+              </div>
+              <div className="control-bar-divider" />
+            </>
+          )}
           <div className="control-bar-group">
             <BrowserControlSelect
               icon={<ArrowUpDown size={15} />}
@@ -282,6 +289,10 @@ export function AffiliationWall({
         ] as const,
     )
     .sort(([leftName, , left], [rightName, , right]) => {
+      if (sortMode === 'title') {
+        const result = leftName.localeCompare(rightName, 'zh-CN', { numeric: true })
+        return sortDirection === 'ascending' ? result : -result
+      }
       return compareMediaItems(left, right, sortMode, sortDirection) || leftName.localeCompare(rightName, 'zh-CN')
     })
   const usesPosterCards = entries[0]?.[1][0]?.library === 'erAnime' || entries[0]?.[1][0]?.library === 'anime'
@@ -296,7 +307,6 @@ export function AffiliationWall({
         const affiliation = group.key
         const episodes = group.items
         const coverItem = [...episodes].sort(compareMediaEpisodes)[0]
-        const isCreator = coverItem.library === 'creator'
         return (
           <button
             data-group-key={affiliation}
@@ -313,10 +323,10 @@ export function AffiliationWall({
             onContextMenu={(event) => onOpenBatchMenu?.(episodes, event)}
           >
             <div
-              className={`cover-art affiliation-cover ${coverItem.library === 'erAnime' || coverItem.library === 'anime' ? 'poster-cover' : ''} ${isCreator ? 'creator-cover-placeholder' : ''}`}
-              style={isCreator ? undefined : ({ background: coverItem.cover } as CSSProperties)}
+              className={`cover-art affiliation-cover ${coverItem.library === 'erAnime' || coverItem.library === 'anime' ? 'poster-cover' : ''}`}
+              style={{ background: coverItem.cover } as CSSProperties}
             >
-              {isCreator ? <span className="creator-cover-label">创作者</span> : <span className="cover-grain" />}
+              <span className="cover-grain" />
             </div>
             <span className="affiliation-card-info">
               <strong>{affiliation}</strong>
@@ -486,6 +496,23 @@ export function GroupSelectionSurface({
   const selectionAnchorRef = useRef<string | null>(null)
   const groupByKey = useMemo(() => new Map(groups.map((group) => [group.key, group])), [groups])
 
+  const cancelSelection = useEffectEvent(() => {
+    const state = dragStateRef.current
+    if (!state) return
+    dragStateRef.current = null
+    setSelectionBox(null)
+    const root = rootRef.current
+    if (root?.hasPointerCapture?.(state.pointerId)) root.releasePointerCapture(state.pointerId)
+  })
+
+  useEffect(() => {
+    window.addEventListener('blur', cancelSelection)
+    return () => {
+      window.removeEventListener('blur', cancelSelection)
+      cancelSelection()
+    }
+  }, [])
+
   function selectRange(target: { key: string; items: MediaItem[] }) {
     if (!onSelectMany) return
     const anchorIndex = groups.findIndex((group) => group.key === selectionAnchorRef.current)
@@ -541,7 +568,7 @@ export function GroupSelectionSurface({
     dragStateRef.current = { ...state, active: false }
   }
 
-  function finishSelection(event: React.PointerEvent<HTMLDivElement>) {
+  function finishSelection(event?: React.PointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current
     if (!state) return
     if (state?.active) {
@@ -552,7 +579,8 @@ export function GroupSelectionSurface({
     }
     dragStateRef.current = null
     setSelectionBox(null)
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    const root = event?.currentTarget ?? rootRef.current
+    if (root?.hasPointerCapture?.(state.pointerId)) root.releasePointerCapture(state.pointerId)
   }
 
   return (

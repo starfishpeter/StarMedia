@@ -107,7 +107,8 @@ async function waitForUpdaterReady({
       if (status === 'ready') return
       if (status.startsWith('failed:')) throw new Error(status.slice('failed:'.length).trim() || '升级器初始化失败')
     } catch (error) {
-      if (error?.code !== 'ENOENT') throw error
+      // PowerShell can briefly lock the status file while replacing its text.
+      if (error?.code !== 'ENOENT' && error?.code !== 'EBUSY') throw error
     }
     await new Promise((resolve) => delay(resolve, pollIntervalMs))
   }

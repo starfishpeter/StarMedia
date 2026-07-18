@@ -366,6 +366,15 @@ const IPC_CONTRACTS = Object.freeze({
         return { id: id(input.id, '媒体 ID'), tags: parseTags(input.tags) }
       }),
   },
+  'library:updateMediaTags': {
+    request: ['StarMediaMediaTagsRequest'],
+    response: 'StarMediaLibraryResult & { item: MediaItem }',
+    parse: (args) =>
+      oneArgument(args, (value) => {
+        const input = object(value, '媒体标签', ['id', 'tags'])
+        return { id: id(input.id, '媒体 ID'), tags: parseTags(input.tags) }
+      }),
+  },
   'library:updateContainerInfo': {
     request: ['StarMediaContainerInfoRequest'],
     response: 'StarMediaLibraryResult & { item: MediaItem }',
@@ -488,6 +497,7 @@ const IPC_CONTRACTS = Object.freeze({
   'window:close': { request: [], response: "'closed' | 'blocked'", parse: noArguments },
   'dialog:chooseDirectory': { request: [], response: 'string | null', parse: noArguments },
   'dialog:chooseImportSources': { request: [], response: 'string[]', parse: noArguments },
+  'dialog:chooseVideoFile': { request: [], response: 'string | null', parse: noArguments },
   'dialog:chooseAppDataBackup': { request: [], response: 'string | null', parse: noArguments },
 })
 

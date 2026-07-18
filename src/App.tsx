@@ -132,7 +132,7 @@ function App() {
   const [playerItem, setPlayerItem] = useState<MediaItem | null>(null)
   const [videoUrl, setVideoUrl] = useState('')
   const [videoMimeType, setVideoMimeType] = useState('')
-  const [videoSubtitles, setVideoSubtitles] = useState<Array<{ url: string; label: string }>>([])
+  const [videoSubtitles, setVideoSubtitles] = useState<Array<{ format: 'ass' | 'vtt'; url: string; label: string }>>([])
   const [videoPlayerStatus, setVideoPlayerStatus] = useState<VideoPlayerStatus>('idle')
   const [videoPlayerError, setVideoPlayerError] = useState('')
   const configReadyRef = useRef(false)
@@ -211,6 +211,7 @@ function App() {
     [activeLibrary, allMedia],
   )
   const queryItems = query.trim() ? scopeItems : browsingItems
+  const usesPerVideoMetadata = activeLibrary?.id === 'creator' || activeLibrary?.id === 'general'
 
   const primaryOptions = useMemo(
     () =>
@@ -248,6 +249,7 @@ function App() {
           .toLocaleLowerCase()
           .includes(normalizedQuery)
       const matchesPrimary =
+        usesPerVideoMetadata ||
         primaryFilter === 'all' ||
         Boolean(
           classification &&
@@ -255,12 +257,12 @@ function App() {
           classification.tags.length > 0 &&
           classification.tags.every((tag) => item.tags.includes(tag)),
         )
-      const matchesTag = tagFilter === 'all' || item.tags.includes(tagFilter)
+      const matchesTag = (usesPerVideoMetadata && !normalizedQuery) || tagFilter === 'all' || item.tags.includes(tagFilter)
       return matchesSearch && matchesPrimary && matchesTag
     })
 
     return [...items].sort((left, right) => compareMediaItems(left, right, sortMode, sortDirection))
-  }, [config.catalog.classifications, primaryFilter, query, queryItems, sortDirection, sortMode, tagFilter])
+  }, [config.catalog.classifications, primaryFilter, query, queryItems, sortDirection, sortMode, tagFilter, usesPerVideoMetadata])
 
   const isAffiliationLibrary = Boolean(activeLibrary && !isArchiveLibrary(activeLibrary.id))
   const isShelfLibrary = Boolean(activeLibrary && isArchiveLibrary(activeLibrary.id))
@@ -615,7 +617,12 @@ function App() {
   }
 
   async function importIntoContainer(library: LibraryId, containerName: string, replacementItemId = '') {
-    if (!window.starMedia?.chooseImportSources || !window.starMedia?.createImportPlan || !window.starMedia?.importMedia) {
+    if (
+      (!replacementItemId && !window.starMedia?.chooseImportSources) ||
+      (Boolean(replacementItemId) && !window.starMedia?.chooseVideoFile) ||
+      !window.starMedia?.createImportPlan ||
+      !window.starMedia?.importMedia
+    ) {
       notify('当前运行环境无法直接导入资源。')
       return
     }
@@ -624,7 +631,13 @@ function App() {
       notify('媒体库设置未能保存。')
       return
     }
-    const sourcePaths = await window.starMedia.chooseImportSources()
+    let sourcePaths: string[]
+    if (replacementItemId) {
+      const source = await window.starMedia.chooseVideoFile?.()
+      sourcePaths = source ? [source] : []
+    } else {
+      sourcePaths = (await window.starMedia.chooseImportSources?.()) ?? []
+    }
     if (sourcePaths.length === 0) return
 
     setDirectImporting(true)
@@ -1106,6 +1119,22 @@ function App() {
     }
   }
 
+  async function updateMediaTags(item: MediaItem, tags: string[]) {
+    if (!window.starMedia?.updateMediaTags) return
+    try {
+      const result = await window.starMedia.updateMediaTags({ id: item.id, tags })
+      setLibraryItems(result.data.items)
+      setSelectedItem((current) => (current?.id === item.id ? result.item : current))
+      setReaderItem((current) => (current?.id === item.id ? result.item : current))
+      setPlayerItem((current) => (current?.id === item.id ? result.item : current))
+      return true
+    } catch (error) {
+      console.error(error)
+      notify('保存标签失败。')
+      return false
+    }
+  }
+
   async function addContainerTag(item: MediaItem, tag: string) {
     const value = tag.trim()
     if (!value) return
@@ -1119,7 +1148,8 @@ function App() {
         throw new Error('标签保存失败')
       }
     }
-    if (!(await updateContainerTags(item, nextTags))) throw new Error('标签保存失败')
+    const updateTags = item.library === 'creator' || item.library === 'general' ? updateMediaTags : updateContainerTags
+    if (!(await updateTags(item, nextTags))) throw new Error('标签保存失败')
   }
 
   async function updateVideoEpisode(item: MediaItem, episode: string) {
@@ -1610,7 +1640,9 @@ function App() {
               libraryItems.filter((entry) => entry.kind === 'video' && entry.library === selectedItem.library).map(getMediaAffiliation),
             ),
           ]}
-          onUpdateTags={updateContainerTags}
+          onUpdateTags={(item, tags) =>
+            void (item.library === 'creator' || item.library === 'general' ? updateMediaTags(item, tags) : updateContainerTags(item, tags))
+          }
           onAddTag={addContainerTag}
           onUpdateBookMetadata={updateBookMetadata}
           onUpdateVideoEpisode={updateVideoEpisode}

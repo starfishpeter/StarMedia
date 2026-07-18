@@ -89,6 +89,28 @@ test('waits for updater readiness and surfaces initialization failures', async (
   assert.equal(updaterReadyTimeoutMs, 60 * 1000)
 })
 
+test('retries a transient updater status-file lock', async () => {
+  let reads = 0
+  await assert.doesNotReject(
+    waitForUpdaterReady({
+      statusPath: 'status.txt',
+      fileSystem: {
+        readFile: async () => {
+          reads += 1
+          if (reads === 1) {
+            const error = new Error('status file is busy')
+            error.code = 'EBUSY'
+            throw error
+          }
+          return 'ready'
+        },
+      },
+      delay: (callback) => callback(),
+    }),
+  )
+  assert.equal(reads, 2)
+})
+
 test('PowerShell runner reports an invalid plan through the handshake file', async (t) => {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'starmedia-updater-runner-test-'))
   t.after(() => fs.rm(root, { recursive: true, force: true }))

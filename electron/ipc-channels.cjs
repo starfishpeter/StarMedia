@@ -22,6 +22,7 @@ const IPC_CHANNELS = Object.freeze({
   bookGetPage: 'book:getPage',
   bookClose: 'book:close',
   libraryUpdateContainerTags: 'library:updateContainerTags',
+  libraryUpdateMediaTags: 'library:updateMediaTags',
   libraryUpdateContainerInfo: 'library:updateContainerInfo',
   libraryUpdateMediaInfo: 'library:updateMediaInfo',
   libraryUpdateVideoEpisode: 'library:updateVideoEpisode',
@@ -46,6 +47,7 @@ const IPC_CHANNELS = Object.freeze({
   windowClose: 'window:close',
   dialogChooseDirectory: 'dialog:chooseDirectory',
   dialogChooseImportSources: 'dialog:chooseImportSources',
+  dialogChooseVideoFile: 'dialog:chooseVideoFile',
   dialogChooseAppDataBackup: 'dialog:chooseAppDataBackup',
 })
 

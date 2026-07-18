@@ -200,6 +200,26 @@ test('stores a release date on one video without changing the rest of its contai
   await assert.rejects(service.updateMediaInfo({ id: first.id, creator: 'Invalid' }), /只有本子或漫画/)
 })
 
+test('stores tags on one video without changing the rest of its creator container', async () => {
+  const first = { id: 'video:1', library: 'creator', kind: 'video', title: 'Episode 1', affiliation: 'Creator', tags: [] }
+  const second = { id: 'video:2', library: 'creator', kind: 'video', title: 'Episode 2', affiliation: 'Creator', tags: ['保留'] }
+  let saved
+  const service = createService({
+    config: { catalog: { tags: ['单集标签', '保留'] } },
+    library: { items: [first, second], operations: [] },
+    saveLibrary: async (data) => {
+      saved = data
+      return { data, libraryPath: 'index.json' }
+    },
+  })
+
+  const result = await service.updateMediaTags({ id: first.id, tags: ['单集标签'] })
+
+  assert.deepEqual(result.item.tags, ['单集标签'])
+  assert.deepEqual(saved.items[1].tags, ['保留'])
+  await assert.rejects(service.updateMediaTags({ id: first.id, tags: ['未登记标签'] }), /未在标签管理中保存/)
+})
+
 test('rolls video episode files and sidecars back when saving metadata fails', async (t) => {
   const root = await createSandbox(t)
   const libraryRoot = path.join(root, 'anime')

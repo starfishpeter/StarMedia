@@ -3,8 +3,8 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
-const { fileURLToPath } = require('node:url')
-const { convertAssToWebVtt, convertSrtToWebVtt, createSubtitlePlaybackTracks } = require('./subtitle-cache-service.cjs')
+const { fileURLToPath, pathToFileURL } = require('node:url')
+const { convertSrtToWebVtt, createSubtitlePlaybackTracks } = require('./subtitle-cache-service.cjs')
 
 async function createSandbox(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'starmedia-subtitle-cache-test-'))
@@ -12,28 +12,8 @@ async function createSandbox(t) {
   return root
 }
 
-test('converts SRT and ASS subtitles into WebVTT cues', () => {
+test('converts SRT subtitles into WebVTT cues', () => {
   assert.equal(convertSrtToWebVtt('1\n00:00:01,250 --> 00:00:02,500\nHello'), 'WEBVTT\n\n00:00:01.250 --> 00:00:02.500\nHello')
-  assert.equal(
-    convertAssToWebVtt('Dialogue: 0,0:00:01.2,0:00:02.34,Default,,0,0,0,,{\\i1}Hello\\NWorld'),
-    'WEBVTT\n\n00:00:01.200 --> 00:00:02.340\nHello\nWorld',
-  )
-})
-
-test('preserves common ASS style attributes in generated WebVTT style rules', () => {
-  const vtt = convertAssToWebVtt(
-    '[V4+ Styles]\nFormat: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding\nStyle: Main,Noto Sans CJK,32,&H0000FFFF,&H00000000,&H00000000,&H80000000,-1,-1,1,0,100,100,0,0,1,2,1,2,10,10,10,1\n[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,Main,,0,0,0,,Styled line',
-  )
-
-  assert.match(vtt, /::cue\(.ass-main\)/)
-  assert.match(vtt, /font-family:"Noto Sans CJK"/)
-  assert.match(vtt, /font-size:32px/)
-  assert.match(vtt, /font-weight:700/)
-  assert.match(vtt, /font-style:italic/)
-  assert.match(vtt, /text-decoration:underline/)
-  assert.match(vtt, /background-color:transparent/)
-  assert.match(vtt, /text-shadow:[^;]*1\.85px 0\.77px 0 rgba\(0, 0, 0, 1\)/)
-  assert.match(vtt, /<c.ass-main>Styled line<\/c>/)
 })
 
 test('caches converted tracks, preserves native VTT files, and protects active cache files while pruning', async (t) => {
@@ -87,7 +67,7 @@ test('skips unreadable subtitle files without preventing the video from receivin
   assert.match(warnings[0], /Missing/)
 })
 
-test('converts embedded ASS content and protects its extraction manifest while pruning', async (t) => {
+test('preserves embedded ASS content for libass and protects its extraction manifest while pruning', async (t) => {
   const root = await createSandbox(t)
   const cacheDir = path.join(root, 'cache~encoded')
   const manifestPath = path.join(cacheDir, 'subtitles', 'embedded', 'track.json')
@@ -113,11 +93,31 @@ test('converts embedded ASS content and protects its extraction manifest while p
 
   assert.equal(tracks.length, 1)
   assert.equal(tracks[0].label, '内嵌字幕 1')
+  assert.equal(tracks[0].format, 'ass')
   assert.equal(protectedPaths.includes(manifestPath), true)
   assert.equal(
-    protectedPaths.some((filePath) => filePath.endsWith('.vtt')),
+    protectedPaths.some((filePath) => filePath.endsWith('.ass')),
     true,
   )
-  const vttPath = fileURLToPath(tracks[0].url)
-  assert.match(await fs.readFile(vttPath, 'utf8'), /内嵌字幕/)
+  const assPath = fileURLToPath(tracks[0].url)
+  assert.match(await fs.readFile(assPath, 'utf8'), /内嵌字幕/)
+})
+
+test('preserves a sidecar ASS file for libass instead of converting it to WebVTT', async (t) => {
+  const root = await createSandbox(t)
+  const cacheDir = path.join(root, 'cache')
+  const assPath = path.join(root, 'episode.ass')
+  await fs.writeFile(
+    assPath,
+    '[Script Info]\n[Events]\nDialogue: 0,0:00:01.00,0:00:02.00,Default,,0,0,0,,{\\pos(400,200)\\fad(100,100)}位置与动画',
+  )
+
+  const tracks = await createSubtitlePlaybackTracks({
+    subtitles: [{ path: assPath, extension: '.ass', label: '中文' }],
+    cacheDir,
+    touchCacheFile: async () => {},
+    pruneCache: async () => {},
+  })
+
+  assert.deepEqual(tracks, [{ format: 'ass', url: pathToFileURL(assPath).toString(), label: '中文' }])
 })

@@ -2,6 +2,25 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.6.35] - 2026-07-18
+
+### 移除
+
+- 移除 AniDB 刮削来源、设置项和客户端登记依赖；升级后会忽略旧 AniDB 配置，并清理媒体索引中的旧 AniDB 刮削标识。
+
+### 改进
+
+- ASS 字幕改由 libass WebAssembly 直接渲染，并内置 Noto Sans CJK SC 中文回退字体，保留原有位置、分层描边、逐 cue 样式、淡入淡出、动画及复杂排版。
+- 原创库的创作者卡片与详情页改为使用该创作者首个视频的实际缩略图，不再显示占位图。
+- 原创创作者和综合节目合集不再提供合集级标签或分类筛选。单个视频仍可独立添加、删除和搜索标签，且标签不会同步到同一创作者或节目的其它视频。
+
+### 修复
+
+- 视频详情的“替换文件”改为只选择单个受支持的视频文件，不再因 Windows 文件/文件夹混合选择器而只能选择目录。
+- 在线刮削和 Bangumi 独立直连增加 30 秒连接超时，避免网络连接长期悬挂。
+- 媒体墙、合集、选集和导入计划的框选手势在窗口失焦、指针取消或组件卸载时主动释放指针捕获，避免异常拖动状态残留影响后续控件交互。
+- 合集墙按标题排序时直接以合集名称比较，不再受合集内单集标题影响。
+
 ## [0.6.30] - 2026-07-18
 
 ### 修复
@@ -127,3 +146,4 @@
 [0.6.28]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.28
 [0.6.29]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.29
 [0.6.30]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.30
+[0.6.35]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.35

@@ -35,7 +35,7 @@ const { clearEmptyMediaDirectories: clearEmptyMediaDirectoriesForConfig } = requ
 const { createPortableDataService } = require('./portable-data-service.cjs')
 const { createScraperAdapters } = require('./scraper-adapters.cjs')
 const { createScraperApplicationService } = require('./scraper-application-service.cjs')
-const { createNetworkProxyService, createSystemNetworkFetch } = require('./system-network-service.cjs')
+const { createNetworkProxyService, createSystemNetworkFetch, fetchWithTimeout } = require('./system-network-service.cjs')
 const { createSubtitlePlaybackTracks } = require('./subtitle-cache-service.cjs')
 const { extractMatroskaSubtitles } = require('./matroska-subtitle-service.cjs')
 const { createThumbnailService, getCurrentArchiveCoverPath } = require('./thumbnail-service.cjs')
@@ -160,7 +160,11 @@ async function fetchBangumiDirect(url, options = {}) {
   const bangumiSession = session.fromPartition('starmedia-bangumi-direct')
   if (!bangumiDirectProxyTask) bangumiDirectProxyTask = bangumiSession.setProxy({ mode: 'direct' })
   await bangumiDirectProxyTask
-  return net.fetch(url, { ...options, session: bangumiSession })
+  return fetchWithTimeout(
+    (requestUrl, requestOptions) => net.fetch(requestUrl, { ...requestOptions, session: bangumiSession }),
+    url,
+    options,
+  )
 }
 
 function getNetworkProxyService() {
@@ -584,6 +588,17 @@ async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
       delete migrated.hanimeUrl
       next = migrated
     }
+    if (next?.scraperSource === 'AniDB' || next?.anidbId || next?.anidbUrl) {
+      const migrated = { ...next }
+      if (migrated.scraperSource === 'AniDB') {
+        delete migrated.scraperSource
+        delete migrated.scraperId
+        delete migrated.scraperUrl
+      }
+      delete migrated.anidbId
+      delete migrated.anidbUrl
+      next = migrated
+    }
     if (next !== item) changed = true
     return next
   })
@@ -870,6 +885,10 @@ async function updateContainerTags(input) {
   return libraryMetadataService.updateContainerTags(input)
 }
 
+async function updateMediaTags(input) {
+  return libraryMetadataService.updateMediaTags(input)
+}
+
 async function updateMediaInfo(input) {
   return libraryMetadataService.updateMediaInfo(input)
 }
@@ -1129,6 +1148,8 @@ function registerIpc() {
 
   handle(IPC_CHANNELS.libraryUpdateContainerTags, async (_event, input) => withFileOperationLock(() => updateContainerTags(input)))
 
+  handle(IPC_CHANNELS.libraryUpdateMediaTags, async (_event, input) => withFileOperationLock(() => updateMediaTags(input)))
+
   handle(IPC_CHANNELS.libraryUpdateContainerInfo, async (_event, input) => withFileOperationLock(() => updateContainerInfo(input)))
 
   handle(IPC_CHANNELS.libraryUpdateMediaInfo, async (_event, input) => withFileOperationLock(() => updateMediaInfo(input)))
@@ -1192,6 +1213,10 @@ function registerIpc() {
 
   handle(IPC_CHANNELS.dialogChooseImportSources, async (event) =>
     desktopDialogService.chooseImportSources(BrowserWindow.fromWebContents(event.sender)),
+  )
+
+  handle(IPC_CHANNELS.dialogChooseVideoFile, async (event) =>
+    desktopDialogService.chooseVideoFile(BrowserWindow.fromWebContents(event.sender)),
   )
 
   handle(IPC_CHANNELS.dialogChooseAppDataBackup, async (event) =>

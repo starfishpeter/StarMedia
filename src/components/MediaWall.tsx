@@ -1,5 +1,5 @@
 import { MoreHorizontal } from 'lucide-react'
-import { useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useEffectEvent, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { libraryById, type MediaItem } from '../data'
 import { getEpisodeCover, getMediaAffiliation, getMediaEpisode, getMediaShelf } from '../domain/media'
 import { calculateVirtualGrid, type VirtualGridRange } from '../domain/virtual-grid'
@@ -97,6 +97,23 @@ export function MediaWall({
     }
   }, [items.length, shouldVirtualize])
 
+  const cancelDragSelection = useEffectEvent(() => {
+    const state = dragStateRef.current
+    if (!state) return
+    dragStateRef.current = null
+    setSelectionBox(null)
+    const root = wallRef.current
+    if (root?.hasPointerCapture?.(state.pointerId)) root.releasePointerCapture(state.pointerId)
+  })
+
+  useEffect(() => {
+    window.addEventListener('blur', cancelDragSelection)
+    return () => {
+      window.removeEventListener('blur', cancelDragSelection)
+      cancelDragSelection()
+    }
+  }, [])
+
   function selectCard(item: MediaItem, useRange: boolean) {
     const anchorId = selectionAnchorRef.current
     if (useRange && anchorId && onSelectMany) {
@@ -153,7 +170,7 @@ export function MediaWall({
     }
   }
 
-  function finishDragSelection(event: React.PointerEvent<HTMLDivElement>) {
+  function finishDragSelection(event?: React.PointerEvent<HTMLDivElement>) {
     const state = dragStateRef.current
     if (!state) return
     if (state.active) {
@@ -164,7 +181,8 @@ export function MediaWall({
     }
     dragStateRef.current = null
     setSelectionBox(null)
-    if (event.currentTarget.hasPointerCapture?.(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+    const root = event?.currentTarget ?? wallRef.current
+    if (root?.hasPointerCapture?.(state.pointerId)) root.releasePointerCapture(state.pointerId)
   }
 
   const commonProps = {

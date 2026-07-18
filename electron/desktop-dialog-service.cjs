@@ -1,5 +1,10 @@
 const os = require('node:os')
 const path = require('node:path')
+const { supportedVideoExtensions } = require('./import-service.cjs')
+
+const supportedVideoFileExtensions = [...supportedVideoExtensions]
+  .map((extension) => extension.slice(1))
+  .sort((left, right) => left.localeCompare(right))
 
 function createDesktopDialogService({
   showSaveDialog,
@@ -82,6 +87,17 @@ function createDesktopDialogService({
     return result.canceled ? [] : result.filePaths
   }
 
+  async function chooseVideoFile(owner) {
+    const result = await withOwner(owner, (dialogOwner) =>
+      showOpenDialog(dialogOwner, {
+        title: '选择替换视频文件',
+        properties: ['openFile'],
+        filters: [{ name: '支持的视频文件', extensions: supportedVideoFileExtensions }],
+      }),
+    )
+    return result.canceled ? null : (result.filePaths[0] ?? null)
+  }
+
   async function chooseAppDataBackup(owner) {
     const result = await withOwner(owner, (dialogOwner) =>
       showOpenDialog(dialogOwner, {
@@ -97,6 +113,7 @@ function createDesktopDialogService({
     chooseAppDataBackup,
     chooseDirectory,
     chooseImportSources,
+    chooseVideoFile,
     createPortableDataBackup,
     isPortableDataExportInProgress,
     showPortableExportWarning,

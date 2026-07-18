@@ -4,7 +4,7 @@ import { BookReader } from './BookReader'
 import { ContainerOverview } from './ContainerOverview'
 import { DetailPanel } from './DetailPanel'
 import { ImportView } from './ImportView'
-import { LibraryBrowser } from './LibraryBrowserViews'
+import { AffiliationWall, LibraryBrowser } from './LibraryBrowserViews'
 import { MediaBatchMenu } from './MediaBatchMenu'
 import { MediaWall } from './MediaWall'
 import { TagEditor } from './TagEditor'
@@ -133,8 +133,8 @@ describe('renderer component smoke coverage', () => {
           sourceUrl="file:///episode.mp4"
           mimeType="video/mp4"
           subtitles={[
-            { url: 'file:///zh.vtt', label: '中文' },
-            { url: 'file:///en.vtt', label: 'English' },
+            { format: 'vtt', url: 'file:///zh.vtt', label: '中文' },
+            { format: 'vtt', url: 'file:///en.vtt', label: 'English' },
           ]}
           status="ready"
           errorMessage=""
@@ -163,6 +163,99 @@ describe('renderer component smoke coverage', () => {
 
   it('keeps media library navigation in the configured order', () => {
     expect(libraries.map((library) => library.id)).toEqual(['erAnime', 'anime', 'creator', 'general', 'books', 'comics'])
+  })
+
+  it('sorts affiliation cards by their displayed titles rather than episode titles', () => {
+    const markup = renderToStaticMarkup(
+      <AffiliationWall
+        items={[
+          { ...video, id: 'season-3', title: 'A later episode', affiliation: '摇曳露营 第三季' },
+          { ...video, id: 'season-2', title: 'Z earlier episode', affiliation: '摇曳露营 第二季' },
+        ]}
+        sortMode="title"
+        sortDirection="ascending"
+        onOpen={noOp}
+      />,
+    )
+
+    expect(markup.indexOf('data-group-key="摇曳露营 第二季"')).toBeLessThan(markup.indexOf('data-group-key="摇曳露营 第三季"'))
+  })
+
+  it('uses video metadata for creator and general videos without exposing collection tag controls', () => {
+    const creatorVideo: MediaItem = {
+      ...video,
+      library: 'creator',
+      affiliation: 'Creator',
+      cover: 'url("file:///creator-thumb.jpg") center / cover',
+    }
+    const generalVideo: MediaItem = { ...video, library: 'general', affiliation: 'Program' }
+    const creatorLibrary = renderToStaticMarkup(
+      <LibraryBrowser
+        activeLibrary={libraryById.creator}
+        queryActive={false}
+        visibleItems={[creatorVideo]}
+        isAffiliationLibrary
+        isShelfLibrary={false}
+        selectedAffiliation={null}
+        selectedShelf={null}
+        selectedIds={[]}
+        viewMode="large"
+        primaryFilter="all"
+        tagFilter="all"
+        sortMode="title"
+        sortDirection="ascending"
+        primaryOptions={['不应显示']}
+        tagOptions={['动作']}
+        sortOptions={[{ value: 'title', label: '标题' }]}
+        onBrowseStateChange={noOp}
+        onReset={noOp}
+        onClearSelection={noOp}
+        onOpenAffiliation={noOp}
+        onOpenShelf={noOp}
+        onOpenItem={noOp}
+        onToggleSelection={noOp}
+        onOpenBatchMenu={noOp}
+        onOpenBatchMenuForItems={noOp}
+        onSelectMany={noOp}
+        affiliationOverview={null}
+        shelfOverview={null}
+      />,
+    )
+    const creatorOverview = renderToStaticMarkup(
+      <ContainerOverview
+        kind="affiliation"
+        name="Creator"
+        items={[creatorVideo]}
+        availableTags={['动作']}
+        onBack={noOp}
+        onOpen={noOp}
+        onSaveNote={noOp}
+        onSaveTags={noOp}
+      />,
+    )
+    const generalDetail = renderToStaticMarkup(
+      <DetailPanel
+        item={generalVideo}
+        availableTags={['动作']}
+        classifications={[]}
+        availableCreators={[]}
+        onUpdateTags={noOp}
+        onUpdateBookMetadata={async () => {}}
+        onUpdateVideoEpisode={async () => generalVideo}
+        onUpdateVideoReleaseDate={async () => generalVideo}
+        onClose={noOp}
+        onRead={noOp}
+        onPlayVideo={noOp}
+        onOpenExternal={noOp}
+      />,
+    )
+
+    expect(creatorLibrary).toContain('creator-thumb.jpg')
+    expect(creatorLibrary).not.toContain('不应显示')
+    expect(creatorLibrary).not.toContain('标签')
+    expect(creatorOverview).not.toContain('container-tag-editor')
+    expect(generalDetail).toContain('>标签<')
+    expect(generalDetail).not.toContain('标签（作用于整个合集）')
   })
 
   it('caps the initial archive media wall DOM for large libraries', () => {

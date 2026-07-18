@@ -5,6 +5,47 @@ function describeNetworkError(error) {
   return detail && detail !== primary ? `${primary}（${detail}）` : primary || '未知网络错误'
 }
 
+const defaultNetworkTimeoutMs = 30_000
+
+function createNetworkTimeoutError(timeoutMs, cause) {
+  const seconds = Math.max(1, Math.ceil(timeoutMs / 1000))
+  return new Error(`网络请求超时（${seconds} 秒）`, cause === undefined ? undefined : { cause })
+}
+
+async function fetchWithTimeout(fetcher, url, options = {}, timeoutMs = defaultNetworkTimeoutMs) {
+  if (typeof fetcher !== 'function') throw new Error('网络请求函数不可用')
+  if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) throw new Error('网络请求超时时间无效')
+
+  const controller = new globalThis.AbortController()
+  const upstreamSignal = options.signal
+  let timedOut = false
+  const abortFromUpstream = () => controller.abort(upstreamSignal?.reason)
+  if (upstreamSignal?.aborted) abortFromUpstream()
+  else upstreamSignal?.addEventListener('abort', abortFromUpstream, { once: true })
+  const timeout = setTimeout(() => {
+    timedOut = true
+    controller.abort()
+  }, timeoutMs)
+  let cleanedUp = false
+  const cleanUp = () => {
+    if (cleanedUp) return
+    cleanedUp = true
+    globalThis.clearTimeout(timeout)
+    upstreamSignal?.removeEventListener('abort', abortFromUpstream)
+  }
+  const withTimeoutError = (error) => (timedOut ? createNetworkTimeoutError(timeoutMs, error) : error)
+
+  let response
+  try {
+    response = await fetcher(url, { ...options, signal: controller.signal })
+  } catch (error) {
+    cleanUp()
+    throw withTimeoutError(error)
+  }
+  cleanUp()
+  return response
+}
+
 function normalizeProxyUrl(value) {
   const source = String(value ?? '')
     .trim()
@@ -46,24 +87,37 @@ function createNetworkProxyService({ electronSession }) {
   return { configure, isEnabled: () => enabled }
 }
 
-function createSystemNetworkFetch({ electronFetch, fallbackFetch = globalThis.fetch, isProxyEnabled = () => false }) {
+function createSystemNetworkFetch({
+  electronFetch,
+  fallbackFetch = globalThis.fetch,
+  isProxyEnabled = () => false,
+  timeoutMs = defaultNetworkTimeoutMs,
+}) {
   if (typeof electronFetch !== 'function' || typeof fallbackFetch !== 'function') throw new Error('系统网络服务依赖不可用')
   if (typeof isProxyEnabled !== 'function') throw new Error('系统网络代理状态依赖不可用')
 
   return async function fetchWithSystemNetwork(url, options = {}) {
     let systemError
     try {
-      return await electronFetch(url, options)
+      return await fetchWithTimeout(electronFetch, url, options, timeoutMs)
     } catch (error) {
       systemError = error
     }
     if (isProxyEnabled()) throw new Error(`通过应用代理连接失败：${describeNetworkError(systemError)}`, { cause: systemError })
     try {
-      return await fallbackFetch(url, options)
+      return await fetchWithTimeout(fallbackFetch, url, options, timeoutMs)
     } catch (error) {
       throw new Error(`${describeNetworkError(systemError)}；${describeNetworkError(error)}`, { cause: error })
     }
   }
 }
 
-module.exports = { createNetworkProxyService, createSystemNetworkFetch, describeNetworkError, normalizeProxyUrl }
+module.exports = {
+  createNetworkProxyService,
+  createNetworkTimeoutError,
+  createSystemNetworkFetch,
+  defaultNetworkTimeoutMs,
+  describeNetworkError,
+  fetchWithTimeout,
+  normalizeProxyUrl,
+}

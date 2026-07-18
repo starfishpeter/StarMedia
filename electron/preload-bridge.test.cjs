@@ -34,6 +34,7 @@ test('maps every public invoke API to exactly one declared IPC channel', async (
     [IPC_CHANNELS.videoOpenExternal]: () => bridge.openVideoExternally('video:1'),
     [IPC_CHANNELS.videoUpdateMetadata]: () => bridge.updateVideoMetadata({}),
     [IPC_CHANNELS.libraryUpdateContainerTags]: () => bridge.updateContainerTags({}),
+    [IPC_CHANNELS.libraryUpdateMediaTags]: () => bridge.updateMediaTags({}),
     [IPC_CHANNELS.libraryUpdateContainerInfo]: () => bridge.updateContainerInfo({}),
     [IPC_CHANNELS.libraryUpdateMediaInfo]: () => bridge.updateMediaInfo({}),
     [IPC_CHANNELS.libraryUpdateVideoEpisode]: () => bridge.updateVideoEpisode({}),
@@ -58,6 +59,7 @@ test('maps every public invoke API to exactly one declared IPC channel', async (
     [IPC_CHANNELS.windowClose]: () => bridge.closeWindow(),
     [IPC_CHANNELS.dialogChooseDirectory]: () => bridge.chooseDirectory(),
     [IPC_CHANNELS.dialogChooseImportSources]: () => bridge.chooseImportSources(),
+    [IPC_CHANNELS.dialogChooseVideoFile]: () => bridge.chooseVideoFile(),
     [IPC_CHANNELS.dialogChooseAppDataBackup]: () => bridge.chooseAppDataBackup(),
   }
 
