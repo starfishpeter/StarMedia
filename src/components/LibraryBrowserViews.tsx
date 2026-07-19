@@ -75,7 +75,7 @@ export function LibraryBrowser({
   libraryUsageBytes: number | null
 }) {
   const showingContainer = Boolean(selectedAffiliation || selectedShelf)
-  const supportsExternalSubtitleBadges = Boolean(activeLibrary && !isArchiveLibrary(activeLibrary.id))
+  const supportsSubtitleBadges = Boolean(activeLibrary && !isArchiveLibrary(activeLibrary.id))
   const sortDirectionOptions: BrowserOption[] =
     sortMode === 'title'
       ? [
@@ -134,7 +134,7 @@ export function LibraryBrowser({
               onChange={(value) => onBrowseStateChange({ sortDirection: value as SortDirection })}
               options={sortDirectionOptions}
             />
-            {supportsExternalSubtitleBadges && (
+            {supportsSubtitleBadges && (
               <label className="toolbar-toggle" aria-label="显示额外信息角标">
                 <span className="toolbar-toggle-label">额外信息</span>
                 <span className="toolbar-toggle-state">{showExternalSubtitleBadges ? '开' : '关'}</span>
@@ -321,8 +321,11 @@ export function AffiliationWall({
               style={{ background: coverItem.cover } as CSSProperties}
             >
               <span className="cover-grain" />
-              {showExternalSubtitleBadges && episodes.some(hasExternalSubtitle) && (
-                <span className="external-subtitle-badge">外挂字幕</span>
+              {showExternalSubtitleBadges && (episodes.some(hasExternalSubtitle) || episodes.some(hasEmbeddedSubtitle)) && (
+                <span className="subtitle-badges">
+                  {episodes.some(hasExternalSubtitle) && <span className="external-subtitle-badge">外挂字幕</span>}
+                  {episodes.some(hasEmbeddedSubtitle) && <span className="embedded-subtitle-badge">内嵌字幕</span>}
+                </span>
               )}
             </div>
             <span className="affiliation-card-info">
@@ -367,6 +370,10 @@ function ToolbarSelect({
 
 function hasExternalSubtitle(item: MediaItem) {
   return Array.isArray(item.sidecars) && item.sidecars.length > 0
+}
+
+function hasEmbeddedSubtitle(item: MediaItem) {
+  return item.hasEmbeddedSubtitles === true
 }
 
 export function ArchiveLibraryView({

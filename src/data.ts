@@ -31,6 +31,7 @@ export interface MediaItem {
   episodeTitle?: string
   episodeNote?: string
   episodeAiredAt?: string
+  hasEmbeddedSubtitles?: boolean
   note: string
   sourcePath?: string
   relativePath?: string

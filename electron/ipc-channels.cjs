@@ -31,6 +31,7 @@ const IPC_CHANNELS = Object.freeze({
   libraryTransferItems: 'library:transferItems',
   libraryMoveVideoAffiliation: 'library:moveVideoAffiliation',
   libraryTrashItems: 'library:trashItems',
+  libraryTrashVideoContainer: 'library:trashVideoContainer',
   libraryRegenerateThumbnails: 'library:regenerateThumbnails',
   libraryClearCaches: 'library:clearCaches',
   libraryClearEmptyMediaDirectories: 'library:clearEmptyMediaDirectories',

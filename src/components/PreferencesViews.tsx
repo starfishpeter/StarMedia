@@ -227,7 +227,7 @@ export function SettingsView({
                   <HardDrive size={18} />
                   <div>
                     <h2>本地缓存</h2>
-                    <p>阅读页与缩略图缓存。</p>
+                    <p>阅读页、字幕转换与内嵌字幕提取缓存。</p>
                   </div>
                 </div>
                 <div className="application-setting-control">
@@ -245,7 +245,7 @@ export function SettingsView({
                     <small>
                       <i>128 MB</i>
                       <i>8192 MB</i>
-                      <b>超过上限后自动清理较早缓存。</b>
+                      <b>超过上限后自动清理较早缓存；缩略图和封面不受此上限影响。</b>
                     </small>
                   </label>
                 </div>

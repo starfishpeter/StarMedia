@@ -307,6 +307,7 @@ interface Window {
       studio?: string
       firstAiredAt?: string
       releaseDate?: string
+      hasEmbeddedSubtitles?: boolean
     }) => Promise<StarMediaLibraryResult & { item: import('./data').MediaItem }>
     updateMediaInfo?: (input: {
       id: string
@@ -329,6 +330,7 @@ interface Window {
     trashLibraryItems?: (input: {
       ids: string[]
     }) => Promise<StarMediaLibraryResult & { deletedCount: number; recordOnlyCount: number; failedCount?: number; errors?: string[] }>
+    trashVideoContainer?: (input: { id: string }) => Promise<StarMediaLibraryResult & { deletedCount: number; containerName: string }>
     regenerateThumbnails?: () => Promise<StarMediaLibraryResult & { generatedCount: number; failedCount: number }>
     clearCaches?: () => Promise<StarMediaLibraryResult & { clearedCoverCount: number }>
     clearEmptyMediaDirectories?: () => Promise<{ removedCount: number }>

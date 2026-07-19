@@ -2,6 +2,7 @@ const fs = require('node:fs/promises')
 const { randomUUID } = require('node:crypto')
 const path = require('node:path')
 const { isPathInside } = require('./file-operations.cjs')
+const { getItemAffiliation } = require('./import-service.cjs')
 
 function createLibraryMaintenanceService({ loadConfig, loadLibrary, saveLibrary, trashItem, fileSystem = fs }) {
   if (
@@ -123,7 +124,86 @@ function createLibraryMaintenanceService({ loadConfig, loadLibrary, saveLibrary,
     }
   }
 
-  return { trashLibraryItems }
+  async function trashVideoContainer(input) {
+    const id = String(input?.id ?? '').trim()
+    if (!id) throw new Error('请选择要删除的合集')
+    const [config, library] = await Promise.all([loadConfig(), loadLibrary()])
+    const selected = library.items.find((item) => item?.id === id && item.kind === 'video')
+    if (!selected) throw new Error('视频合集不存在或已变化')
+
+    const rootPath = String(config.libraries[selected.library]?.rootPath ?? '').trim()
+    if (!path.isAbsolute(rootPath)) throw new Error('当前媒体库未配置受管理根目录')
+    const resolvedRoot = path.resolve(rootPath)
+    const containerName = getItemAffiliation(selected)
+    const containerItems = library.items.filter(
+      (item) => item?.kind === 'video' && item.library === selected.library && getItemAffiliation(item) === containerName,
+    )
+    const directories = [
+      ...new Set(
+        containerItems
+          .map((item) =>
+            typeof item?.sourcePath === 'string' && path.isAbsolute(item.sourcePath) ? path.dirname(path.resolve(item.sourcePath)) : '',
+          )
+          .filter(Boolean),
+      ),
+    ]
+    if (directories.length !== 1) throw new Error('这个合集的文件分布在多个文件夹中，无法安全删除整个合集目录')
+    const containerDirectory = directories[0]
+    if (!isPathInside(resolvedRoot, containerDirectory) || containerDirectory === resolvedRoot)
+      throw new Error('合集目录不在当前媒体库受管理路径内')
+
+    const indexedItems = library.items.filter(
+      (item) =>
+        item?.library === selected.library &&
+        typeof item.sourcePath === 'string' &&
+        path.isAbsolute(item.sourcePath) &&
+        isPathInside(containerDirectory, item.sourcePath),
+    )
+    const indexedIds = new Set(indexedItems.map((item) => item.id))
+    for (const item of containerItems) {
+      if (
+        typeof item.sourcePath !== 'string' ||
+        !path.isAbsolute(item.sourcePath) ||
+        !isPathInside(resolvedRoot, item.sourcePath) ||
+        !isPathInside(containerDirectory, item.sourcePath)
+      )
+        throw new Error(`${item.title}: 文件不在待删除的受管理合集目录内`)
+    }
+    for (const item of indexedItems) {
+      for (const sidecar of Array.isArray(item.sidecars) ? item.sidecars : []) {
+        if (
+          typeof sidecar?.sourcePath !== 'string' ||
+          !path.isAbsolute(sidecar.sourcePath) ||
+          !isPathInside(resolvedRoot, sidecar.sourcePath) ||
+          !isPathInside(containerDirectory, sidecar.sourcePath)
+        )
+          throw new Error(`${item.title}: 字幕文件不在待删除的受管理合集目录内`)
+      }
+    }
+    const directoryStat = await fileSystem.stat(containerDirectory).catch((error) => {
+      if (error?.code === 'ENOENT') return null
+      throw error
+    })
+    if (!directoryStat?.isDirectory()) throw new Error('合集实际存储目录不存在，无法删除整个合集')
+
+    await trashItem(containerDirectory)
+    const operation = {
+      id: `trash-container:${randomUUID()}`,
+      type: 'library-container-trash',
+      status: 'complete',
+      itemIds: [...indexedIds],
+      library: selected.library,
+      containerName,
+      createdAt: new Date().toISOString(),
+    }
+    const saved = await saveLibrary({
+      items: library.items.filter((item) => !indexedIds.has(item.id)),
+      operations: [...library.operations, operation],
+    })
+    return { ...saved, deletedCount: indexedIds.size, containerName }
+  }
+
+  return { trashLibraryItems, trashVideoContainer }
 }
 
 module.exports = { createLibraryMaintenanceService }

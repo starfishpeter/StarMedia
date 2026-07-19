@@ -109,6 +109,7 @@ function createLibraryMetadataService({
     const hasStudio = typeof input.studio === 'string'
     const hasFirstAiredAt = typeof input.firstAiredAt === 'string'
     const hasReleaseDate = typeof input.releaseDate === 'string'
+    const hasEmbeddedSubtitles = typeof input.hasEmbeddedSubtitles === 'boolean'
     const config = hasTags || hasName || hasOriginalTitle ? await loadConfig() : null
     let tags
     if (hasTags) {
@@ -180,6 +181,7 @@ function createLibraryMetadataService({
         ...(hasStudio ? { studio } : {}),
         ...(hasFirstAiredAt ? { firstAiredAt } : {}),
         ...(hasReleaseDate ? { releaseDate } : {}),
+        ...(hasEmbeddedSubtitles ? { hasEmbeddedSubtitles: input.hasEmbeddedSubtitles } : {}),
       }
     })
     try {

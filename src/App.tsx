@@ -1217,15 +1217,17 @@ function App() {
     const oldShelf = getMediaShelf(item)
     try {
       const containerMetadata =
-        item.kind === 'book' || item.library === 'creator'
+        item.kind === 'book'
           ? { id: item.id, name: metadata.name }
-          : {
-              id: item.id,
-              name: metadata.name,
-              originalTitle: metadata.originalTitle,
-              studio: metadata.studio,
-              firstAiredAt: metadata.firstAiredAt,
-            }
+          : item.library === 'creator'
+            ? { id: item.id, name: metadata.name }
+            : {
+                id: item.id,
+                name: metadata.name,
+                originalTitle: metadata.originalTitle,
+                studio: metadata.studio,
+                firstAiredAt: metadata.firstAiredAt,
+              }
       const result = await window.starMedia.updateContainerInfo(containerMetadata)
       setLibraryItems(result.data.items)
       setSelectedItem((current) => (current?.id === item.id ? result.item : current))
@@ -1239,6 +1241,43 @@ function App() {
       console.error(error)
       notify(error instanceof Error ? error.message : '保存合集资料失败。')
       throw error
+    }
+  }
+
+  async function updateContainerEmbeddedSubtitles(item: MediaItem, hasEmbeddedSubtitles: boolean) {
+    if (!window.starMedia?.updateContainerInfo) return item
+    try {
+      const result = await window.starMedia.updateContainerInfo({ id: item.id, hasEmbeddedSubtitles })
+      setLibraryItems(result.data.items)
+      setSelectedItem((current) => (current?.id === item.id ? result.item : current))
+      setPlayerItem((current) => (current?.id === item.id ? result.item : current))
+      notify(hasEmbeddedSubtitles ? '已标记合集包含内嵌字幕。' : '已取消合集内嵌字幕标记。')
+      return result.item
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `保存内嵌字幕状态失败：${error.message}` : '保存内嵌字幕状态失败。')
+      throw error
+    }
+  }
+
+  async function trashVideoContainer(item: MediaItem) {
+    if (!window.starMedia?.trashVideoContainer) return
+    const affiliation = getMediaAffiliation(item)
+    if (!window.confirm(`将整个合集「${affiliation}」目录移入系统回收站，包括未索引文件、视频、字幕和封面，并移除全部索引记录。是否继续？`))
+      return
+    try {
+      const result = await window.starMedia.trashVideoContainer({ id: item.id })
+      const remainingIds = new Set(result.data.items.map((candidate) => candidate.id))
+      if (activeLibrary) pendingLibraryScrollRestoreRef.current = libraryScrollPositionsRef.current[activeLibrary.id]
+      setLibraryItems(result.data.items)
+      setSelectedMediaIds((current) => current.filter((id) => remainingIds.has(id)))
+      setSelectedItem((current) => (current && remainingIds.has(current.id) ? current : null))
+      setPlayerItem((current) => (current && remainingIds.has(current.id) ? current : null))
+      setSelectedAffiliation(null)
+      notify(`已将合集「${result.containerName}」移入回收站并移除 ${result.deletedCount} 条索引记录。`)
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `删除合集失败：${error.message}` : '删除合集失败。')
     }
   }
 
@@ -1417,7 +1456,6 @@ function App() {
         </div>
 
         <nav className="library-nav" aria-label="媒体库导航">
-          <div className="nav-label">媒体库</div>
           {libraries.map((library) => (
             <NavigationButton
               key={library.id}
@@ -1600,6 +1638,8 @@ function App() {
                   onSaveMetadata={updateContainerMetadata}
                   onSaveTags={updateContainerTags}
                   onAddTag={addContainerTag}
+                  onDelete={(item) => void trashVideoContainer(item)}
+                  onUpdateEmbeddedSubtitles={updateContainerEmbeddedSubtitles}
                   onSearchBangumi={searchBangumiSubjects}
                   onPreviewBangumi={previewBangumiSubject}
                   onApplyBangumi={applyBangumiSubject}

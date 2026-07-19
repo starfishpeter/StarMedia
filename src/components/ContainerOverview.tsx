@@ -1,4 +1,4 @@
-import { ChevronLeft, ExternalLink, UploadCloud } from 'lucide-react'
+import { ChevronLeft, ExternalLink, Trash2, UploadCloud } from 'lucide-react'
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { MediaItem } from '../data'
 import { compareMediaEpisodes, getEpisodeCover, getMediaEpisode } from '../domain/media'
@@ -6,7 +6,12 @@ import { createAllScrapeFields } from '../domain/scrape'
 import { MediaWall } from './MediaWall'
 import { TagEditor } from './TagEditor'
 
-export type ContainerMetadata = { name: string; originalTitle: string; studio: string; firstAiredAt: string }
+export type ContainerMetadata = {
+  name: string
+  originalTitle: string
+  studio: string
+  firstAiredAt: string
+}
 type ScrapeDraftValues = Required<StarMediaScrapeFields>
 type ScrapeWritableField = Exclude<keyof ScrapeDraftValues, 'releaseDate'>
 type ScrapeApplyTarget = ScrapeWritableField | 'all'
@@ -36,6 +41,8 @@ export function ContainerOverview({
   onSaveMetadata,
   onSaveTags,
   onAddTag,
+  onDelete,
+  onUpdateEmbeddedSubtitles,
   onSearchBangumi,
   onPreviewBangumi,
   onApplyBangumi,
@@ -61,6 +68,8 @@ export function ContainerOverview({
   onSaveMetadata?: (item: MediaItem, metadata: ContainerMetadata) => Promise<MediaItem | undefined>
   onSaveTags: (item: MediaItem, tags: string[]) => void
   onAddTag?: (item: MediaItem, tag: string) => Promise<void>
+  onDelete?: (item: MediaItem) => void
+  onUpdateEmbeddedSubtitles?: (item: MediaItem, hasEmbeddedSubtitles: boolean) => Promise<MediaItem | undefined>
   onSearchBangumi?: (query: string) => Promise<StarMediaBangumiSubject[]>
   onPreviewBangumi?: (subjectId: number) => Promise<StarMediaScrapePreview>
   onApplyBangumi?: (item: MediaItem, subjectId: number, fields: StarMediaScrapeFields) => Promise<StarMediaBangumiSubject | undefined>
@@ -127,6 +136,8 @@ export function ContainerOverview({
   const [editingMetadata, setEditingMetadata] = useState(false)
   const [metadataSaving, setMetadataSaving] = useState(false)
   const [metadataError, setMetadataError] = useState('')
+  const [hasEmbeddedSubtitles, setHasEmbeddedSubtitles] = useState(Boolean(representative?.hasEmbeddedSubtitles))
+  const [embeddedSubtitleSaving, setEmbeddedSubtitleSaving] = useState(false)
   const noteRef = useRef<HTMLParagraphElement | null>(null)
 
   useEffect(() => setDraftNote(representative?.note ?? ''), [name, representative?.id, representative?.note])
@@ -140,6 +151,10 @@ export function ContainerOverview({
       }),
     [name, representative?.id, representative?.originalTitle, representative?.studio, representative?.firstAiredAt],
   )
+  useEffect(
+    () => setHasEmbeddedSubtitles(Boolean(representative?.hasEmbeddedSubtitles)),
+    [name, representative?.id, representative?.hasEmbeddedSubtitles],
+  )
   const resetContainerState = useEffectEvent(() => {
     setScraperQuery(representative?.originalTitle?.trim() || name)
     setBangumiId(representative?.bangumiId ?? (representative?.scraperSource === 'Bangumi' ? (representative.scraperId ?? '') : ''))
@@ -151,13 +166,7 @@ export function ContainerOverview({
     setHanimeSubjects([])
     setScrapePreview(null)
     setScrapeDraft(emptyScrapeDraftValues)
-    setScraperSource(
-      representative?.scraperSource === 'FreeAnimeHentai'
-        ? 'freeanimehentai'
-        : representative?.scraperSource === 'Hanime1'
-          ? 'hanime1'
-          : 'bangumi',
-    )
+    setScraperSource('bangumi')
     setScraperStatus('idle')
     setApplyingField(null)
     setLastAppliedField(null)
@@ -360,6 +369,19 @@ export function ContainerOverview({
     closeScrapePreview()
   }
 
+  function toggleScraper() {
+    if (scraperOpen) {
+      setScraperOpen(false)
+      return
+    }
+    setScraperSource('bangumi')
+    setBangumiSubjects([])
+    setHanimeSubjects([])
+    setScraperError('')
+    closeScrapePreview()
+    setScraperOpen(true)
+  }
+
   async function saveMetadata() {
     if (!onSaveMetadata) return
     setMetadataSaving(true)
@@ -374,6 +396,19 @@ export function ContainerOverview({
     }
   }
 
+  async function saveEmbeddedSubtitles(nextValue: boolean) {
+    if (!onUpdateEmbeddedSubtitles) return
+    setEmbeddedSubtitleSaving(true)
+    try {
+      await onUpdateEmbeddedSubtitles(representative, nextValue)
+      setHasEmbeddedSubtitles(nextValue)
+    } catch {
+      // The caller reports persistence errors and the current state remains unchanged.
+    } finally {
+      setEmbeddedSubtitleSaving(false)
+    }
+  }
+
   return (
     <section className="container-overview">
       <div className="container-overview-heading">
@@ -385,6 +420,16 @@ export function ContainerOverview({
       <article
         className={`collection-hero ${usesPosterCover ? 'poster-collection' : 'video-collection'} ${isCreatorContainer ? 'creator-collection' : ''}`}
       >
+        {kind === 'affiliation' && onDelete && (
+          <button
+            className="collection-trash-button"
+            onClick={() => onDelete(representative)}
+            aria-label="删除整个合集"
+            title="删除整个合集"
+          >
+            <Trash2 size={18} />
+          </button>
+        )}
         <div className="collection-backdrop" style={{ background: coverItem?.cover ?? representative.cover } as CSSProperties} />
         <div className="collection-hero-content">
           <div
@@ -412,9 +457,22 @@ export function ContainerOverview({
                 {editingNote ? '收起简介' : '编辑简介'}
               </button>
               {canUseScraper && (
-                <button className="secondary-button" onClick={() => setScraperOpen((current) => !current)}>
+                <button className="secondary-button" onClick={toggleScraper}>
                   {scraperOpen ? '收起刮削' : '网络刮削'}
                 </button>
+              )}
+              {kind === 'affiliation' && onUpdateEmbeddedSubtitles && (
+                <label className="toolbar-toggle collection-action-toggle" aria-label="是否内嵌字幕">
+                  <span className="toolbar-toggle-label">内嵌字幕</span>
+                  <span className="toolbar-toggle-state">{embeddedSubtitleSaving ? '保存中' : hasEmbeddedSubtitles ? '开' : '关'}</span>
+                  <input
+                    type="checkbox"
+                    checked={hasEmbeddedSubtitles}
+                    disabled={embeddedSubtitleSaving}
+                    onChange={(event) => void saveEmbeddedSubtitles(event.target.checked)}
+                  />
+                  <span className="toolbar-switch" aria-hidden="true" />
+                </label>
               )}
             </div>
             {editingMetadata && (

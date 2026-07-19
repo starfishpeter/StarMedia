@@ -244,7 +244,17 @@ function parseImportMediaRequest(value) {
 }
 
 function parseContainerInfo(value) {
-  const input = object(value, '合集资料', ['id', 'tags', 'note', 'name', 'originalTitle', 'studio', 'firstAiredAt', 'releaseDate'])
+  const input = object(value, '合集资料', [
+    'id',
+    'tags',
+    'note',
+    'name',
+    'originalTitle',
+    'studio',
+    'firstAiredAt',
+    'releaseDate',
+    'hasEmbeddedSubtitles',
+  ])
   const result = { id: id(input.id, '媒体 ID') }
   if (input.tags !== undefined) result.tags = parseTags(input.tags)
   if (input.note !== undefined) result.note = string(input.note, '备注', { max: 1200, trim: true })
@@ -253,6 +263,10 @@ function parseContainerInfo(value) {
   if (input.studio !== undefined) result.studio = string(input.studio, '制作公司', { max: 200, trim: true })
   if (input.firstAiredAt !== undefined) result.firstAiredAt = string(input.firstAiredAt, '首播日期', { max: 40, trim: true })
   if (input.releaseDate !== undefined) result.releaseDate = string(input.releaseDate, '发售日期', { max: 40, trim: true })
+  if (input.hasEmbeddedSubtitles !== undefined) {
+    if (typeof input.hasEmbeddedSubtitles !== 'boolean') fail('内嵌字幕状态无效')
+    result.hasEmbeddedSubtitles = input.hasEmbeddedSubtitles
+  }
   if (Object.keys(result).length === 1) fail('没有需要保存的合集资料')
   return result
 }
@@ -425,6 +439,15 @@ const IPC_CONTRACTS = Object.freeze({
       oneArgument(args, (value) => {
         const input = object(value, '删除请求', ['ids'])
         return { ids: uniqueIds(input.ids, '媒体 ID') }
+      }),
+  },
+  'library:trashVideoContainer': {
+    request: ['StarMediaTrashVideoContainerRequest'],
+    response: 'StarMediaLibraryResult & { deletedCount: number; containerName: string }',
+    parse: (args) =>
+      oneArgument(args, (value) => {
+        const input = object(value, '合集删除请求', ['id'])
+        return { id: id(input.id, '媒体 ID') }
       }),
   },
   'library:regenerateThumbnails': {

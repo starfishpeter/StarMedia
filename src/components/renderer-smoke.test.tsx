@@ -168,7 +168,7 @@ describe('renderer component smoke coverage', () => {
     expect(markup).toContain('时长')
     expect(markup).toContain('24:00')
     expect(markup).toContain('适应窗口')
-    expect(markup).toContain('原始尺寸')
+    expect(markup).toContain('影院模式')
     expect(markup).toContain('toolbar-switch')
     expect(markup).toContain('>关<')
     expect(markup).toContain('额外信息')
@@ -234,6 +234,47 @@ describe('renderer component smoke coverage', () => {
     expect(enabled).toContain('external-subtitle-badge')
     expect(enabled).toContain('外挂')
     expect(disabled).not.toContain('external-subtitle-badge')
+  })
+
+  it('shows embedded and external subtitle badges together only when extra information is enabled', () => {
+    const items = [
+      {
+        ...video,
+        id: 'subtitled',
+        hasEmbeddedSubtitles: true,
+        sidecars: [{ fileName: 'Episode 1.ass', sourcePath: 'C:\\Media\\Series\\Episode 1.ass', extension: '.ass', size: 8 }],
+      },
+    ]
+    const enabled = renderToStaticMarkup(
+      <AffiliationWall items={items} sortMode="title" sortDirection="ascending" showExternalSubtitleBadges onOpen={noOp} />,
+    )
+    const disabled = renderToStaticMarkup(<AffiliationWall items={items} sortMode="title" sortDirection="ascending" onOpen={noOp} />)
+
+    expect(enabled).toContain('外挂字幕')
+    expect(enabled).toContain('内嵌字幕')
+    expect(enabled).toContain('subtitle-badges')
+    expect(disabled).not.toContain('subtitle-badges')
+  })
+
+  it('places the embedded subtitle switch in the collection action row', () => {
+    const markup = renderToStaticMarkup(
+      <ContainerOverview
+        kind="affiliation"
+        name="Series"
+        items={[video]}
+        availableTags={[]}
+        onBack={noOp}
+        onOpen={noOp}
+        onSaveNote={noOp}
+        onSaveMetadata={async () => video}
+        onSaveTags={noOp}
+        onUpdateEmbeddedSubtitles={async () => video}
+      />,
+    )
+
+    expect(markup).toContain('collection-action-toggle')
+    expect(markup).toContain('内嵌字幕')
+    expect(markup).not.toContain('collection-embedded-subtitle-toggle')
   })
 
   it('does not offer media-library transfer for a single video selection', () => {

@@ -937,6 +937,10 @@ async function trashLibraryItems(input) {
   return libraryMaintenanceService.trashLibraryItems(input)
 }
 
+async function trashVideoContainer(input) {
+  return libraryMaintenanceService.trashVideoContainer(input)
+}
+
 async function updateVideoMetadata(input) {
   return libraryMetadataService.updateVideoMetadata(input)
 }
@@ -1230,6 +1234,8 @@ function registerIpc() {
 
   handle(IPC_CHANNELS.libraryTrashItems, async (_event, input) => withFileOperationLock(() => trashLibraryItems(input)))
 
+  handle(IPC_CHANNELS.libraryTrashVideoContainer, async (_event, input) => withFileOperationLock(() => trashVideoContainer(input)))
+
   handle(IPC_CHANNELS.libraryRegenerateThumbnails, async () => withFileOperationLock(() => regenerateAllThumbnails()))
 
   handle(IPC_CHANNELS.libraryClearCaches, async () => withFileOperationLock(() => clearCaches()))
@@ -1391,6 +1397,7 @@ module.exports = {
   transferLibraryItems,
   moveVideoToAffiliation,
   trashLibraryItems,
+  trashVideoContainer,
   updateVideoEpisode,
   updateContainerInfo,
   updateMediaInfo,

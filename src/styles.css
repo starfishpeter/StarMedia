@@ -5,7 +5,7 @@
 /* ── 1. DESIGN TOKENS ──────────────────────────────────────────────────── */
 
 :root {
-  --window-titlebar-height: 54px;
+  --window-titlebar-height: 62px;
   --sidebar-width: 236px;
   --radius-xs: 6px;
   --radius-sm: 9px;
@@ -241,7 +241,7 @@ img {
   align-items: center;
   gap: 10px;
   padding: 0 8px;
-  margin-bottom: 6px;
+  margin-bottom: 2px;
   border-bottom: 1px solid var(--line);
 }
 .brand-mark {
@@ -267,8 +267,8 @@ img {
   flex: 1 1 auto;
   min-height: 0;
   flex-direction: column;
-  gap: 2px;
-  padding-top: 10px;
+  gap: 4px;
+  padding-top: 12px;
   overflow-y: auto;
   scrollbar-width: none;
 }
@@ -907,7 +907,7 @@ select:focus {
   transition: transform 0.16s ease;
 }
 .toolbar-toggle input:checked + .toolbar-switch {
-  background: #0a84ff;
+  background: var(--accent);
 }
 .toolbar-toggle input:checked + .toolbar-switch::after {
   transform: translateX(16px);
@@ -977,6 +977,8 @@ select:focus {
 .media-wall {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
+  align-content: start;
+  align-items: start;
   gap: 22px 20px;
 }
 .media-wall.media-selection-surface {
@@ -996,6 +998,7 @@ select:focus {
 }
 
 .media-card {
+  align-self: start;
   display: block;
   min-width: 0;
   padding: 0;
@@ -1297,11 +1300,19 @@ select:focus {
 .affiliation-cover {
   aspect-ratio: 16 / 9;
 }
-.external-subtitle-badge {
+.subtitle-badges {
   position: absolute;
   right: 4px;
   bottom: 5px;
   z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 5px;
+  max-width: calc(100% - 8px);
+}
+.external-subtitle-badge,
+.embedded-subtitle-badge {
   padding: 5px 8px;
   color: #ffffff;
   font-size: 13px;
@@ -1315,6 +1326,15 @@ select:focus {
     0 2px 7px rgba(0, 0, 0, 0.44),
     0 0 0 1px rgba(0, 47, 106, 0.3);
   text-shadow: 0 1px 1px rgba(0, 39, 88, 0.46);
+}
+.external-subtitle-badge {
+  border-color: rgba(191, 226, 255, 0.9);
+  background: #0878dc;
+}
+.embedded-subtitle-badge {
+  border-color: rgba(255, 220, 153, 0.92);
+  background: #dc7d08;
+  text-shadow: 0 1px 1px rgba(86, 43, 0, 0.52);
 }
 .affiliation-card:hover .cover-art {
   border-color: var(--accent-soft);
@@ -1431,6 +1451,24 @@ select:focus {
   border-radius: var(--radius-lg);
   background: #12141c;
   isolation: isolate;
+}
+.collection-trash-button {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  z-index: 2;
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  color: #fff;
+  border: 1px solid rgba(255, 160, 160, 0.48);
+  border-radius: 9px;
+  background: rgba(210, 45, 55, 0.92);
+  box-shadow: 0 3px 12px rgba(0, 0, 0, 0.26);
+}
+.collection-trash-button:hover {
+  background: #e83b4d;
 }
 .collection-backdrop {
   position: absolute;
@@ -2184,6 +2222,7 @@ select:focus {
 .collection-editor-actions {
   grid-column: 1 / -1;
   display: flex;
+  justify-content: flex-end;
   gap: 7px;
 }
 
@@ -3806,6 +3845,14 @@ select:focus {
   overflow: hidden;
   background: #000;
 }
+.video-canvas.theater-mode {
+  width: min(82vw, 1240px);
+  height: min(70vh, 700px);
+  margin: clamp(22px, 5vh, 72px) auto 92px;
+  border: 1px solid rgba(255, 255, 255, 0.13);
+  border-radius: 12px;
+  box-shadow: 0 16px 56px rgba(0, 0, 0, 0.42);
+}
 .video-player {
   position: absolute;
   inset: 0;
@@ -3822,8 +3869,8 @@ select:focus {
 .video-player.fit-contain {
   object-fit: contain;
 }
-.video-player.fit-native {
-  object-fit: none;
+.video-player.fit-theater {
+  object-fit: contain;
 }
 .video-player::cue {
   background-color: transparent;

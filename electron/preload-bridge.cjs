@@ -46,6 +46,7 @@ function createPreloadBridge({ invoke, subscribe, getPathForFile }) {
     transferLibraryItems: (input) => call(IPC_CHANNELS.libraryTransferItems, input),
     moveVideoToAffiliation: (input) => call(IPC_CHANNELS.libraryMoveVideoAffiliation, input),
     trashLibraryItems: (input) => call(IPC_CHANNELS.libraryTrashItems, input),
+    trashVideoContainer: (input) => call(IPC_CHANNELS.libraryTrashVideoContainer, input),
     regenerateThumbnails: () => call(IPC_CHANNELS.libraryRegenerateThumbnails),
     clearCaches: () => call(IPC_CHANNELS.libraryClearCaches),
     clearEmptyMediaDirectories: () => call(IPC_CHANNELS.libraryClearEmptyMediaDirectories),

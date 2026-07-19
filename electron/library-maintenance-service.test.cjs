@@ -232,3 +232,63 @@ test('reports a partial result when media reaches the recycle bin but a sidecar 
   assert.deepEqual(saved.operations[0].partialItemIds, [item.id])
   assert.equal(await fs.readFile(sidecarPath, 'utf8'), 'subtitle')
 })
+
+test('recycles a complete managed video container and removes every indexed item inside it', async (t) => {
+  const root = await createSandbox(t)
+  const libraryRoot = path.join(root, 'anime')
+  const containerDirectory = path.join(libraryRoot, 'Collection')
+  const first = createItem(root, { id: 'video:1', affiliation: 'Collection', sourcePath: path.join(containerDirectory, 'first.mp4') })
+  const second = createItem(root, { id: 'video:2', affiliation: 'Collection', sourcePath: path.join(containerDirectory, 'second.mp4') })
+  const sidecarPath = path.join(containerDirectory, 'first.srt')
+  await fs.mkdir(containerDirectory, { recursive: true })
+  await Promise.all([
+    fs.writeFile(first.sourcePath, 'first'),
+    fs.writeFile(second.sourcePath, 'second'),
+    fs.writeFile(sidecarPath, 'subtitle'),
+    fs.writeFile(path.join(containerDirectory, 'cover.jpg'), 'unindexed cover'),
+  ])
+  let saved
+  const trashed = []
+  const service = createLibraryMaintenanceService({
+    loadConfig: async () => ({ libraries: { anime: { rootPath: libraryRoot } } }),
+    loadLibrary: async () => ({ items: [{ ...first, sidecars: [{ sourcePath: sidecarPath }] }, second], operations: [] }),
+    saveLibrary: async (data) => {
+      saved = data
+      return { data, libraryPath: 'index.json' }
+    },
+    trashItem: async (target) => {
+      trashed.push(target)
+      await fs.rm(target, { recursive: true, force: false })
+    },
+  })
+
+  const result = await service.trashVideoContainer({ id: first.id })
+
+  assert.equal(result.deletedCount, 2)
+  assert.equal(result.containerName, 'Collection')
+  assert.deepEqual(saved.items, [])
+  assert.deepEqual(trashed, [containerDirectory])
+  await assert.rejects(fs.access(containerDirectory), { code: 'ENOENT' })
+  assert.equal(saved.operations[0].type, 'library-container-trash')
+})
+
+test('does not recycle a video container outside its configured root', async (t) => {
+  const root = await createSandbox(t)
+  const libraryRoot = path.join(root, 'anime')
+  const item = createItem(root, { affiliation: 'Collection', sourcePath: path.join(root, 'outside', 'episode.mp4') })
+  await fs.mkdir(path.dirname(item.sourcePath), { recursive: true })
+  await fs.writeFile(item.sourcePath, 'video')
+  const trashed = []
+  const service = createLibraryMaintenanceService({
+    loadConfig: async () => ({ libraries: { anime: { rootPath: libraryRoot } } }),
+    loadLibrary: async () => ({ items: [item], operations: [] }),
+    saveLibrary: async () => {
+      throw new Error('must not save')
+    },
+    trashItem: async (target) => trashed.push(target),
+  })
+
+  await assert.rejects(service.trashVideoContainer({ id: item.id }), /不在当前媒体库受管理路径内/)
+  assert.deepEqual(trashed, [])
+  assert.equal(await fs.readFile(item.sourcePath, 'utf8'), 'video')
+})

@@ -200,6 +200,28 @@ test('stores a release date on one video without changing the rest of its contai
   await assert.rejects(service.updateMediaInfo({ id: first.id, creator: 'Invalid' }), /只有本子或漫画/)
 })
 
+test('stores embedded subtitle status across every video in a container', async () => {
+  const first = { id: 'video:1', library: 'anime', kind: 'video', title: 'Episode 1', affiliation: 'Series', hasEmbeddedSubtitles: false }
+  const second = { id: 'video:2', library: 'anime', kind: 'video', title: 'Episode 2', affiliation: 'Series', hasEmbeddedSubtitles: false }
+  let saved
+  const service = createService({
+    config: { libraries: { anime: { rootPath: '' } }, catalog: { tags: [] } },
+    library: { items: [first, second], operations: [] },
+    saveLibrary: async (data) => {
+      saved = data
+      return { data, libraryPath: 'index.json' }
+    },
+  })
+
+  const result = await service.updateContainerInfo({ id: first.id, hasEmbeddedSubtitles: true })
+
+  assert.equal(result.item.hasEmbeddedSubtitles, true)
+  assert.deepEqual(
+    saved.items.map((item) => item.hasEmbeddedSubtitles),
+    [true, true],
+  )
+})
+
 test('stores tags on one video without changing the rest of its creator container', async () => {
   const first = { id: 'video:1', library: 'creator', kind: 'video', title: 'Episode 1', affiliation: 'Creator', tags: [] }
   const second = { id: 'video:2', library: 'creator', kind: 'video', title: 'Episode 2', affiliation: 'Creator', tags: ['保留'] }

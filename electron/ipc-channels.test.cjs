@@ -81,6 +81,11 @@ test('IPC request contracts reject malformed, oversized, and ambiguous input', (
     () => parseIpcRequest(IPC_CHANNELS.bangumiAssignEpisodes, [{ id: 'video:1', subjectId: 0 }]),
     /Bangumi ID必须是有效的正整数/,
   )
+  assert.throws(() => parseIpcRequest(IPC_CHANNELS.libraryTrashVideoContainer, [{ id: '' }]), /媒体 ID不能为空/)
+  assert.throws(
+    () => parseIpcRequest(IPC_CHANNELS.libraryUpdateContainerInfo, [{ id: 'video:1', hasEmbeddedSubtitles: 'yes' }]),
+    /内嵌字幕状态无效/,
+  )
   assert.throws(
     () =>
       parseIpcRequest(IPC_CHANNELS.configSave, [
@@ -119,4 +124,7 @@ test('IPC request contracts return normalized safe request shapes', () => {
 
   const [tagRequest] = parseIpcRequest(IPC_CHANNELS.libraryUpdateMediaTags, [{ id: 'video:creator:item', tags: [' 单集标签 '] }])
   assert.deepEqual(tagRequest, { id: 'video:creator:item', tags: ['单集标签'] })
+
+  const [containerTrashRequest] = parseIpcRequest(IPC_CHANNELS.libraryTrashVideoContainer, [{ id: 'video:anime:item' }])
+  assert.deepEqual(containerTrashRequest, { id: 'video:anime:item' })
 })

@@ -43,6 +43,7 @@ test('maps every public invoke API to exactly one declared IPC channel', async (
     [IPC_CHANNELS.libraryTransferItems]: () => bridge.transferLibraryItems({}),
     [IPC_CHANNELS.libraryMoveVideoAffiliation]: () => bridge.moveVideoToAffiliation({}),
     [IPC_CHANNELS.libraryTrashItems]: () => bridge.trashLibraryItems({}),
+    [IPC_CHANNELS.libraryTrashVideoContainer]: () => bridge.trashVideoContainer({}),
     [IPC_CHANNELS.libraryRegenerateThumbnails]: () => bridge.regenerateThumbnails(),
     [IPC_CHANNELS.libraryClearCaches]: () => bridge.clearCaches(),
     [IPC_CHANNELS.libraryClearEmptyMediaDirectories]: () => bridge.clearEmptyMediaDirectories(),

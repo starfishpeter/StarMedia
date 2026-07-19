@@ -100,7 +100,7 @@ export function VideoPlayer({
   const suppressVideoClickRef = useRef(false)
   const selectedRateRef = useRef(1)
   const [playbackError, setPlaybackError] = useState(false)
-  const [fitMode, setFitMode] = useState<'contain' | 'native'>('contain')
+  const [fitMode, setFitMode] = useState<'contain' | 'theater'>('contain')
   const [playbackRate, setPlaybackRate] = useState(1)
   const [selectedSubtitle, setSelectedSubtitle] = useState('off')
   const [isPlaying, setIsPlaying] = useState(false)
@@ -384,8 +384,8 @@ export function VideoPlayer({
             <button type="button" aria-pressed={fitMode === 'contain'} onClick={() => setFitMode('contain')}>
               适应窗口
             </button>
-            <button type="button" aria-pressed={fitMode === 'native'} onClick={() => setFitMode('native')}>
-              原始尺寸
+            <button type="button" aria-pressed={fitMode === 'theater'} onClick={() => setFitMode('theater')}>
+              影院模式
             </button>
           </div>
           {canSetFrameCover && (
@@ -414,11 +414,11 @@ export function VideoPlayer({
         )}
         {status === 'ready' && sourceUrl && !playbackError && (
           <div className="video-frame">
-            <div className="video-canvas">
+            <div className={`video-canvas ${fitMode === 'theater' ? 'theater-mode' : ''}`}>
               <video
                 key={sourceUrl}
                 ref={videoRef}
-                className={`video-player ${fitMode === 'native' ? 'fit-native' : 'fit-contain'}`}
+                className={`video-player ${fitMode === 'theater' ? 'fit-theater' : 'fit-contain'}`}
                 autoPlay
                 playsInline
                 onClick={() => {
