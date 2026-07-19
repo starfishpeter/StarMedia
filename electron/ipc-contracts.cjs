@@ -142,6 +142,7 @@ function parseConfig(value) {
     'theme',
     'cacheLimitMb',
     'confirmBeforeClose',
+    'showExternalSubtitleBadges',
     'network',
     'scraping',
     'libraries',
@@ -152,6 +153,7 @@ function parseConfig(value) {
   if (!['dark', 'light', 'blue'].includes(config.theme)) fail('主题无效')
   if (!Number.isFinite(config.cacheLimitMb) || config.cacheLimitMb < 128 || config.cacheLimitMb > 8192) fail('缓存上限无效')
   if (typeof config.confirmBeforeClose !== 'boolean') fail('关闭确认设置无效')
+  if (typeof config.showExternalSubtitleBadges !== 'boolean') fail('外挂字幕角标设置无效')
 
   const network = object(config.network, '网络配置', ['proxyEnabled', 'proxyUrl'])
   if (typeof network.proxyEnabled !== 'boolean') fail('代理开关无效')
@@ -181,26 +183,8 @@ function parseConfig(value) {
     if (!['ascending', 'descending'].includes(library.sortDirection)) fail(`${libraryId} 排序方向无效`)
   }
 
-  const catalog = object(config.catalog, '词汇配置', ['tags', 'classifications', 'studios', 'creators'])
-  const tags = parseTags(catalog.tags, '词汇标签')
-  list(catalog.studios, '制作公司', { max: 1000, item: (entry, label) => string(entry, label, { min: 1, max: 200, trim: true }) })
-  list(catalog.creators, '创作者', { max: 1000, item: (entry, label) => string(entry, label, { min: 1, max: 200, trim: true }) })
-  const classifications = list(catalog.classifications, '分类', {
-    max: 1000,
-    item: (entry, label) => {
-      const classification = object(entry, label, ['id', 'name', 'tags', 'libraryIds'])
-      id(classification.id, `${label}.id`)
-      string(classification.name, `${label}.name`, { min: 1, max: 80, trim: true })
-      const classificationTags = parseTags(classification.tags, `${label}.tags`)
-      if (classificationTags.some((tag) => !tags.includes(tag))) fail(`${label}包含未定义标签`)
-      uniqueIds(classification.libraryIds, `${label}.libraryIds`, { min: 0, max: libraryIds.length }).forEach((libraryId) =>
-        parseLibraryId(libraryId, `${label}.libraryIds`),
-      )
-      return classification
-    },
-  })
-  const classificationIds = classifications.map((classification) => classification.id)
-  if (new Set(classificationIds).size !== classificationIds.length) fail('分类 ID 不能重复')
+  const catalog = object(config.catalog, '词汇配置', ['tags'])
+  parseTags(catalog.tags, '词汇标签')
   return config
 }
 
@@ -282,6 +266,11 @@ const IPC_CONTRACTS = Object.freeze({
     parse: (args) => oneArgument(args, parseImportPlanRequest),
   },
   'library:load': { request: [], response: 'StarMediaLibraryResult', parse: noArguments },
+  'library:getUsage': {
+    request: ['libraryId'],
+    response: 'StarMediaLibraryUsage',
+    parse: (args) => oneArgument(args, (value) => parseLibraryId(value, '媒体库 ID')),
+  },
   'library:importMedia': {
     request: ['StarMediaImportMediaRequest'],
     response: 'StarMediaImportResult',

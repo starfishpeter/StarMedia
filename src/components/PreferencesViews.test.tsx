@@ -9,6 +9,7 @@ const config: StarMediaConfig = {
   theme: 'dark',
   cacheLimitMb: 4096,
   confirmBeforeClose: true,
+  showExternalSubtitleBadges: false,
   network: { proxyEnabled: false, proxyUrl: '' },
   scraping: { bangumiToken: '', bangumiEndpoint: 'https://api.bgm.tv', hanime1Endpoint: 'https://hanime1.com' },
   libraries: {
@@ -19,7 +20,7 @@ const config: StarMediaConfig = {
     comics: { rootPath: 'C:\\Media\\漫画', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
     general: { rootPath: 'C:\\Media\\综合', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
   },
-  catalog: { tags: [], classifications: [], studios: [], creators: [] },
+  catalog: { tags: [] },
 }
 
 describe('SettingsView', () => {

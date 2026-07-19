@@ -1,4 +1,4 @@
-import { ArrowUpDown, Check, LibraryBig, Search, SlidersHorizontal } from 'lucide-react'
+import { ArrowUpDown, LibraryBig, Search } from 'lucide-react'
 import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { type LibraryDefinition, type MediaItem } from '../data'
 import {
@@ -13,42 +13,7 @@ import { DropdownSelect } from './DropdownSelect'
 import { MediaWall } from './MediaWall'
 
 type ViewMode = 'large' | 'list'
-
-type BrowserOption = string | { value: string; label: string }
-
-function BrowserControlSelect({
-  icon,
-  label,
-  value,
-  onChange,
-  options,
-  includeAll = true,
-}: {
-  icon: ReactNode
-  label: string
-  value: string
-  onChange: (value: string) => void
-  options: BrowserOption[]
-  includeAll?: boolean
-}) {
-  return (
-    <DropdownSelect
-      className="toolbar-select"
-      prefix={
-        <>
-          <span className="toolbar-select-icon">{icon}</span>
-          <span className="toolbar-select-label">{label}</span>
-        </>
-      }
-      value={value}
-      onChange={onChange}
-      options={[
-        ...(includeAll ? [{ value: 'all', label: '全部' }] : []),
-        ...options.map((option) => (typeof option === 'string' ? { value: option, label: option } : option)),
-      ]}
-    />
-  )
-}
+type BrowserOption = { value: string; label: string }
 
 export function LibraryBrowser({
   activeLibrary,
@@ -60,14 +25,12 @@ export function LibraryBrowser({
   selectedShelf,
   selectedIds,
   viewMode,
-  primaryFilter,
-  tagFilter,
   sortMode,
   sortDirection,
-  primaryOptions,
-  tagOptions,
   sortOptions,
   onBrowseStateChange,
+  showExternalSubtitleBadges,
+  onShowExternalSubtitleBadgesChange,
   onReset,
   onClearSelection,
   onOpenAffiliation,
@@ -79,6 +42,7 @@ export function LibraryBrowser({
   onSelectMany,
   affiliationOverview,
   shelfOverview,
+  libraryUsageBytes,
 }: {
   activeLibrary: LibraryDefinition | null
   queryActive: boolean
@@ -89,14 +53,12 @@ export function LibraryBrowser({
   selectedShelf: string | null
   selectedIds: string[]
   viewMode: ViewMode
-  primaryFilter: string
-  tagFilter: string
   sortMode: SortMode
   sortDirection: SortDirection
-  primaryOptions: string[]
-  tagOptions: string[]
   sortOptions: Array<{ value: SortMode; label: string }>
-  onBrowseStateChange: (changes: { primaryFilter?: string; tagFilter?: string; sortMode?: SortMode; sortDirection?: SortDirection }) => void
+  onBrowseStateChange: (changes: { sortMode?: SortMode; sortDirection?: SortDirection }) => void
+  showExternalSubtitleBadges: boolean
+  onShowExternalSubtitleBadgesChange: (value: boolean) => void
   onReset: () => void
   onClearSelection: () => void
   onOpenAffiliation: (affiliation: string) => void
@@ -108,9 +70,10 @@ export function LibraryBrowser({
   onSelectMany: (items: MediaItem[]) => void
   affiliationOverview: ReactNode
   shelfOverview: ReactNode
+  libraryUsageBytes: number | null
 }) {
   const showingContainer = Boolean(selectedAffiliation || selectedShelf)
-  const usesPerVideoMetadata = activeLibrary?.id === 'creator' || activeLibrary?.id === 'general'
+  const supportsExternalSubtitleBadges = Boolean(activeLibrary && !isArchiveLibrary(activeLibrary.id))
   const sortDirectionOptions: BrowserOption[] =
     sortMode === 'title'
       ? [
@@ -121,6 +84,8 @@ export function LibraryBrowser({
           { value: 'ascending', label: '旧 → 新' },
           { value: 'descending', label: '新 → 旧' },
         ]
+  const total =
+    isAffiliationLibrary && !queryActive && !selectedAffiliation ? new Set(visibleItems.map(getMediaAffiliation)).size : visibleItems.length
 
   return (
     <section
@@ -139,50 +104,47 @@ export function LibraryBrowser({
     >
       {!showingContainer && (
         <div className="control-bar">
-          {(!usesPerVideoMetadata || queryActive) && (
-            <>
-              <div className="control-bar-group">
-                {!usesPerVideoMetadata && (
-                  <BrowserControlSelect
-                    icon={<SlidersHorizontal size={15} />}
-                    label={activeLibrary?.primaryLabel ?? '分类'}
-                    value={primaryFilter}
-                    onChange={(value) => onBrowseStateChange({ primaryFilter: value })}
-                    options={primaryOptions}
-                  />
-                )}
-                <BrowserControlSelect
-                  icon={<Check size={15} />}
-                  label="标签"
-                  value={tagFilter}
-                  onChange={(value) => onBrowseStateChange({ tagFilter: value })}
-                  options={tagOptions}
-                />
-              </div>
-              <div className="control-bar-divider" />
-            </>
-          )}
           <div className="control-bar-group">
-            <BrowserControlSelect
+            <ToolbarSelect
               icon={<ArrowUpDown size={15} />}
               label="排序"
               value={sortMode}
               onChange={(value) => onBrowseStateChange({ sortMode: value as SortMode })}
-              includeAll={false}
               options={sortOptions}
             />
-            <BrowserControlSelect
+            <ToolbarSelect
               icon={<ArrowUpDown size={15} />}
               label="方向"
               value={sortDirection}
               onChange={(value) => onBrowseStateChange({ sortDirection: value as SortDirection })}
-              includeAll={false}
               options={sortDirectionOptions}
             />
+            {supportsExternalSubtitleBadges && (
+              <label className="toggle-pill toolbar-toggle">
+                <input
+                  type="checkbox"
+                  checked={showExternalSubtitleBadges}
+                  onChange={(event) => onShowExternalSubtitleBadgesChange(event.target.checked)}
+                />
+                外挂字幕
+              </label>
+            )}
           </div>
           <div className="toolbar-spacer" />
           <div className={`result-total library-item-count ${selectedIds.length > 0 ? 'has-selection' : ''}`}>
-            <LibraryBig size={17} /> {selectedIds.length > 0 ? `已选 ${selectedIds.length} 项` : `${visibleItems.length} 项`}
+            <LibraryBig size={18} />
+            {selectedIds.length > 0 ? (
+              `已选 ${selectedIds.length} 项`
+            ) : (
+              <>
+                <span>
+                  {total} {isAffiliationLibrary && !queryActive && !selectedAffiliation ? '个合集' : '项'}
+                </span>
+                {activeLibrary && libraryUsageBytes !== null && (
+                  <span className="library-usage">占用 {formatBytes(libraryUsageBytes)}</span>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}
@@ -194,6 +156,7 @@ export function LibraryBrowser({
           items={visibleItems}
           sortMode={sortMode}
           sortDirection={sortDirection}
+          showExternalSubtitleBadges={showExternalSubtitleBadges}
           onOpen={onOpenAffiliation}
           selectedIds={selectedIds}
           onOpenBatchMenu={onOpenBatchMenuForItems}
@@ -234,14 +197,26 @@ export function LibraryBrowser({
   )
 }
 
+function formatBytes(bytes: number) {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B'
+  const units = ['B', 'KB', 'MB', 'GB', 'TB']
+  let size = bytes
+  let unit = 0
+  while (size >= 1024 && unit < units.length - 1) {
+    size /= 1024
+    unit += 1
+  }
+  return `${size >= 10 || unit === 0 ? size.toFixed(0) : size.toFixed(1)} ${units[unit]}`
+}
+
 function BrowserEmptyState({ onReset }: { onReset: () => void }) {
   return (
     <div className="empty-state">
       <Search size={30} />
       <h2>没有找到匹配的媒体</h2>
-      <p>可以调整搜索范围、分类或标签筛选。</p>
+      <p>可以调整搜索范围或搜索关键词。</p>
       <button className="secondary-button" onClick={onReset}>
-        清除筛选
+        清除搜索
       </button>
     </div>
   )
@@ -258,6 +233,7 @@ export function AffiliationWall({
   items,
   sortMode,
   sortDirection,
+  showExternalSubtitleBadges = false,
   onOpen,
   selectedIds = [],
   onOpenBatchMenu,
@@ -266,6 +242,7 @@ export function AffiliationWall({
   items: MediaItem[]
   sortMode: SortMode
   sortDirection: SortDirection
+  showExternalSubtitleBadges?: boolean
   onOpen: (affiliation: string) => void
   selectedIds?: string[]
   onOpenBatchMenu?: (items: MediaItem[], event: React.MouseEvent<HTMLElement>) => void
@@ -327,6 +304,7 @@ export function AffiliationWall({
               style={{ background: coverItem.cover } as CSSProperties}
             >
               <span className="cover-grain" />
+              {showExternalSubtitleBadges && episodes.some(hasExternalSubtitle) && <span className="external-subtitle-badge">外挂</span>}
             </div>
             <span className="affiliation-card-info">
               <strong>{affiliation}</strong>
@@ -337,6 +315,39 @@ export function AffiliationWall({
       }}
     </GroupSelectionSurface>
   )
+}
+
+function ToolbarSelect({
+  icon,
+  label,
+  value,
+  onChange,
+  options,
+}: {
+  icon: ReactNode
+  label: string
+  value: string
+  onChange: (value: string) => void
+  options: Array<{ value: string; label: string }>
+}) {
+  return (
+    <DropdownSelect
+      className="toolbar-select"
+      prefix={
+        <>
+          <span className="toolbar-select-icon">{icon}</span>
+          <span className="toolbar-select-label">{label}</span>
+        </>
+      }
+      value={value}
+      onChange={onChange}
+      options={options}
+    />
+  )
+}
+
+function hasExternalSubtitle(item: MediaItem) {
+  return Array.isArray(item.sidecars) && item.sidecars.length > 0
 }
 
 export function ArchiveLibraryView({

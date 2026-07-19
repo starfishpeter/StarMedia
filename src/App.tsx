@@ -23,7 +23,6 @@ import {
 import logoUrl from './assets/starmedia-logo.png'
 
 type Scope = 'all' | 'current' | LibraryId
-type LibraryBrowseState = { primaryFilter: string; tagFilter: string; sortMode: SortMode; sortDirection: SortDirection }
 type SectionId = NavigationId | 'import' | 'settings' | 'vocabularies'
 const defaultLibraryFolders: Record<LibraryId, string> = {
   erAnime: '里番',
@@ -34,20 +33,6 @@ const defaultLibraryFolders: Record<LibraryId, string> = {
   general: '综合',
 }
 
-const defaultLibraryBrowseState: LibraryBrowseState = {
-  primaryFilter: 'all',
-  tagFilter: 'all',
-  sortMode: 'title',
-  sortDirection: 'ascending',
-}
-
-function createLibraryBrowseStates() {
-  return Object.fromEntries(libraries.map((library) => [library.id, { ...defaultLibraryBrowseState }])) as Record<
-    LibraryId,
-    LibraryBrowseState
-  >
-}
-
 const fallbackConfig: StarMediaConfig = {
   schemaVersion: 3,
   updatedAt: new Date().toISOString(),
@@ -55,6 +40,7 @@ const fallbackConfig: StarMediaConfig = {
   theme: 'dark',
   cacheLimitMb: 4096,
   confirmBeforeClose: true,
+  showExternalSubtitleBadges: false,
   network: {
     proxyEnabled: false,
     proxyUrl: '',
@@ -74,9 +60,6 @@ const fallbackConfig: StarMediaConfig = {
   },
   catalog: {
     tags: [],
-    classifications: [],
-    studios: [],
-    creators: [],
   },
 }
 
@@ -99,8 +82,6 @@ function App() {
   const [activeNavigation, setActiveNavigation] = useState<SectionId>('erAnime')
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState<Scope>('all')
-  const [libraryBrowseStates, setLibraryBrowseStates] = useState<Record<LibraryId, LibraryBrowseState>>(createLibraryBrowseStates)
-  const [searchBrowseState, setSearchBrowseState] = useState<LibraryBrowseState>(defaultLibraryBrowseState)
   const [selectedItem, setSelectedItem] = useState<MediaItem | null>(null)
   const [selectedAffiliation, setSelectedAffiliation] = useState<string | null>(null)
   const [selectedShelf, setSelectedShelf] = useState<string | null>(null)
@@ -116,6 +97,7 @@ function App() {
   const [config, setConfig] = useState<StarMediaConfig>(fallbackConfig)
   const [configMeta, setConfigMeta] = useState({ dataRoot: '', configPath: '', backupDir: '', cacheDir: '' })
   const [libraryItems, setLibraryItems] = useState<MediaItem[]>([])
+  const [libraryUsageBytes, setLibraryUsageBytes] = useState<number | null>(null)
   const [importSources, setImportSources] = useState<string[]>([])
   const [importLibrary, setImportLibrary] = useState<ImportTarget>('auto')
   const [importPlan, setImportPlan] = useState<StarMediaImportPlan | null>(null)
@@ -146,26 +128,13 @@ function App() {
   const playerRequestRef = useRef(0)
 
   const activeLibrary = isLibraryNavigation(activeNavigation) ? libraryById[activeNavigation] : null
-  const browseState = activeLibrary
-    ? {
-        ...libraryBrowseStates[activeLibrary.id],
-        sortMode: config.libraries[activeLibrary.id].sortMode,
-        sortDirection: config.libraries[activeLibrary.id].sortDirection,
-      }
-    : searchBrowseState
-  const { primaryFilter, tagFilter, sortMode, sortDirection } = browseState
+  const activeLibraryRoot = activeLibrary ? config.libraries[activeLibrary.id].rootPath : ''
+  const sortMode = activeLibrary ? config.libraries[activeLibrary.id].sortMode : 'title'
+  const sortDirection = activeLibrary ? config.libraries[activeLibrary.id].sortDirection : 'ascending'
   const sortOptions = getSortOptions(activeLibrary?.id ?? null)
-  const updateBrowseState = (changes: Partial<LibraryBrowseState>) => {
-    if (!activeLibrary) {
-      setSearchBrowseState((current) => ({ ...current, ...changes }))
-      return
-    }
-    const { sortMode: nextSortMode, sortDirection: nextSortDirection, ...filterChanges } = changes
-    if (Object.keys(filterChanges).length > 0)
-      setLibraryBrowseStates((current) => ({
-        ...current,
-        [activeLibrary.id]: { ...current[activeLibrary.id], ...filterChanges },
-      }))
+  const updateBrowseState = (changes: { sortMode?: SortMode; sortDirection?: SortDirection }) => {
+    if (!activeLibrary) return
+    const { sortMode: nextSortMode, sortDirection: nextSortDirection } = changes
     if (nextSortMode || nextSortDirection)
       setConfig((current) => ({
         ...current,
@@ -179,7 +148,6 @@ function App() {
         },
       }))
   }
-  const resetBrowseFilters = () => updateBrowseState({ primaryFilter: 'all', tagFilter: 'all' })
   const apiAvailable = Boolean(
     window.starMedia?.getConfig &&
     window.starMedia?.saveConfig &&
@@ -211,26 +179,8 @@ function App() {
     [activeLibrary, allMedia],
   )
   const queryItems = query.trim() ? scopeItems : browsingItems
-  const usesPerVideoMetadata = activeLibrary?.id === 'creator' || activeLibrary?.id === 'general'
-
-  const primaryOptions = useMemo(
-    () =>
-      config.catalog.classifications
-        .filter(
-          (classification) => classification.tags.length > 0 && queryItems.some((item) => classification.libraryIds.includes(item.library)),
-        )
-        .map((classification) => classification.name)
-        .sort((left, right) => left.localeCompare(right, 'zh-CN')),
-    [config.catalog.classifications, queryItems],
-  )
-  const tagOptions = useMemo(
-    () => [...new Set(queryItems.flatMap((item) => item.tags))].sort((left, right) => left.localeCompare(right, 'zh-CN')),
-    [queryItems],
-  )
-
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase()
-    const classification = config.catalog.classifications.find((candidate) => candidate.name === primaryFilter)
     const items = queryItems.filter((item) => {
       const matchesSearch =
         !normalizedQuery ||
@@ -248,21 +198,11 @@ function App() {
           .join(' ')
           .toLocaleLowerCase()
           .includes(normalizedQuery)
-      const matchesPrimary =
-        usesPerVideoMetadata ||
-        primaryFilter === 'all' ||
-        Boolean(
-          classification &&
-          classification.libraryIds.includes(item.library) &&
-          classification.tags.length > 0 &&
-          classification.tags.every((tag) => item.tags.includes(tag)),
-        )
-      const matchesTag = (usesPerVideoMetadata && !normalizedQuery) || tagFilter === 'all' || item.tags.includes(tagFilter)
-      return matchesSearch && matchesPrimary && matchesTag
+      return matchesSearch
     })
 
     return [...items].sort((left, right) => compareMediaItems(left, right, sortMode, sortDirection))
-  }, [config.catalog.classifications, primaryFilter, query, queryItems, sortDirection, sortMode, tagFilter, usesPerVideoMetadata])
+  }, [query, queryItems, sortDirection, sortMode])
 
   const isAffiliationLibrary = Boolean(activeLibrary && !isArchiveLibrary(activeLibrary.id))
   const isShelfLibrary = Boolean(activeLibrary && isArchiveLibrary(activeLibrary.id))
@@ -309,6 +249,27 @@ function App() {
       cancelled = true
     }
   }, [])
+
+  useEffect(() => {
+    const libraryId = activeLibrary?.id
+    if (!libraryId || !window.starMedia?.getLibraryUsage) {
+      setLibraryUsageBytes(null)
+      return
+    }
+    let cancelled = false
+    setLibraryUsageBytes(null)
+    void window.starMedia
+      .getLibraryUsage(libraryId)
+      .then((result) => {
+        if (!cancelled) setLibraryUsageBytes(result.bytes)
+      })
+      .catch(() => {
+        if (!cancelled) setLibraryUsageBytes(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [activeLibrary?.id, activeLibraryRoot, libraryItems])
 
   useEffect(() => {
     currentConfigRef.current = config
@@ -696,19 +657,6 @@ function App() {
     }
   }
 
-  async function moveSingleVideo(item: MediaItem, affiliation: string) {
-    if (!window.starMedia?.moveVideoToAffiliation) return
-    try {
-      const result = await window.starMedia.moveVideoToAffiliation({ id: item.id, affiliation })
-      setLibraryItems(result.data.items)
-      setSelectedItem(result.item)
-      if (selectedAffiliation === getMediaAffiliation(item)) setSelectedAffiliation(result.item.affiliation ?? affiliation)
-      notify(`已移动到合集「${result.item.affiliation ?? affiliation}」。`)
-    } catch (error) {
-      notify(error instanceof Error ? `移动失败：${error.message}` : '移动失败。')
-    }
-  }
-
   async function importMediaRecords() {
     if (!importPlan || !window.starMedia?.importMedia || importOperation !== 'idle') return
     const moveCount = importPlan.items.filter((item) => item.status === 'ready' && Boolean(item.targetPath)).length
@@ -752,7 +700,7 @@ function App() {
 
   async function clearImportedRecords() {
     if (!window.starMedia?.clearImportedRecords) return
-    if (!window.confirm('这会删除应用内全部已导入资产记录，不会移动或删除实际文件；分类和标签会保留。是否继续？')) return
+    if (!window.confirm('这会删除应用内全部已导入资产记录，不会移动或删除实际文件；标签会保留。是否继续？')) return
     try {
       const result = await window.starMedia.clearImportedRecords()
       setLibraryItems(result.data.items)
@@ -1245,11 +1193,6 @@ function App() {
               firstAiredAt: metadata.firstAiredAt,
             }
       const result = await window.starMedia.updateContainerInfo(containerMetadata)
-      if (item.library === 'creator' && metadata.name.trim() && !config.catalog.creators.includes(metadata.name.trim())) {
-        const nextConfig = { ...config, catalog: { ...config.catalog, creators: [...config.catalog.creators, metadata.name.trim()] } }
-        setConfig(nextConfig)
-        await persistConfig(nextConfig)
-      }
       setLibraryItems(result.data.items)
       setSelectedItem((current) => (current?.id === item.id ? result.item : current))
       setReaderItem((current) => (current?.id === item.id ? result.item : current))
@@ -1269,12 +1212,6 @@ function App() {
     if (!window.starMedia?.updateMediaInfo) return
     try {
       const result = await window.starMedia.updateMediaInfo({ id: item.id, ...metadata })
-      const creator = metadata.creator.trim()
-      if (creator && !config.catalog.creators.includes(creator)) {
-        const nextConfig = { ...config, catalog: { ...config.catalog, creators: [...config.catalog.creators, creator] } }
-        setConfig(nextConfig)
-        await persistConfig(nextConfig)
-      }
       setLibraryItems(result.data.items)
       setSelectedItem((current) => (current?.id === item.id ? result.item : current))
       setReaderItem((current) => (current?.id === item.id ? result.item : current))
@@ -1428,7 +1365,7 @@ function App() {
             onClick={() => selectNavigation('import')}
           />
           <NavigationButton
-            label="分类标签"
+            label="标签管理"
             icon={<Tags size={20} />}
             active={activeNavigation === 'vocabularies'}
             onClick={() => selectNavigation('vocabularies')}
@@ -1540,18 +1477,17 @@ function App() {
             selectedShelf={selectedShelf}
             selectedIds={selectedMediaIds}
             viewMode="large"
-            primaryFilter={primaryFilter}
-            tagFilter={tagFilter}
             sortMode={sortMode}
             sortDirection={sortDirection}
-            primaryOptions={primaryOptions}
-            tagOptions={tagOptions}
             sortOptions={sortOptions}
             onBrowseStateChange={updateBrowseState}
             onReset={() => {
-              resetBrowseFilters()
               setQuery('')
             }}
+            showExternalSubtitleBadges={config.showExternalSubtitleBadges}
+            onShowExternalSubtitleBadgesChange={(showExternalSubtitleBadges) =>
+              setConfig((current) => ({ ...current, showExternalSubtitleBadges }))
+            }
             onClearSelection={() => {
               setSelectedMediaIds([])
               setMediaBatchMenu(null)
@@ -1569,6 +1505,7 @@ function App() {
             onOpenBatchMenu={openMediaBatchMenu}
             onOpenBatchMenuForItems={openMediaBatchMenuForItems}
             onSelectMany={selectMediaItems}
+            libraryUsageBytes={libraryUsageBytes}
             affiliationOverview={
               selectedAffiliation && (
                 <ContainerOverview
@@ -1633,13 +1570,6 @@ function App() {
         <DetailPanel
           item={selectedItem}
           availableTags={config.catalog.tags}
-          classifications={config.catalog.classifications}
-          availableCreators={config.catalog.creators}
-          availableAffiliations={[
-            ...new Set(
-              libraryItems.filter((entry) => entry.kind === 'video' && entry.library === selectedItem.library).map(getMediaAffiliation),
-            ),
-          ]}
           onUpdateTags={(item, tags) =>
             void (item.library === 'creator' || item.library === 'general' ? updateMediaTags(item, tags) : updateContainerTags(item, tags))
           }
@@ -1647,7 +1577,6 @@ function App() {
           onUpdateBookMetadata={updateBookMetadata}
           onUpdateVideoEpisode={updateVideoEpisode}
           onUpdateVideoReleaseDate={updateVideoReleaseDate}
-          onMoveVideo={moveSingleVideo}
           onTrash={trashSingleMedia}
           onReplaceVideo={(item) => void importIntoContainer(item.library, getMediaAffiliation(item), item.id)}
           onClose={() => setSelectedItem(null)}

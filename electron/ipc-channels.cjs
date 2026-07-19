@@ -4,6 +4,7 @@ const IPC_CHANNELS = Object.freeze({
   importCreatePlan: 'import:createPlan',
   importProgress: 'import:progress',
   libraryLoad: 'library:load',
+  libraryGetUsage: 'library:getUsage',
   libraryImportMedia: 'library:importMedia',
   libraryClearRecords: 'library:clearRecords',
   libraryThumbnailsUpdated: 'library:thumbnailsUpdated',

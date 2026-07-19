@@ -77,6 +77,30 @@ test('IPC request contracts reject malformed, oversized, and ambiguous input', (
   )
   assert.throws(() => parseIpcRequest(IPC_CHANNELS.videoGetPlayback, ['x'.repeat(4097)]), /媒体 ID 过长/)
   assert.throws(() => parseIpcRequest(IPC_CHANNELS.bookGetPage, ['not-a-session', 0]), /阅读会话 ID 无效/)
+  assert.throws(
+    () =>
+      parseIpcRequest(IPC_CHANNELS.configSave, [
+        {
+          schemaVersion: 3,
+          updatedAt: '2026-07-19T00:00:00.000Z',
+          mediaRoot: '',
+          theme: 'dark',
+          cacheLimitMb: 4096,
+          confirmBeforeClose: true,
+          showExternalSubtitleBadges: 'yes',
+          network: { proxyEnabled: false, proxyUrl: '' },
+          scraping: { bangumiToken: '', bangumiEndpoint: 'https://api.bgm.tv', hanime1Endpoint: 'https://hanime1.com' },
+          libraries: Object.fromEntries(
+            ['erAnime', 'anime', 'creator', 'books', 'comics', 'general'].map((id) => [
+              id,
+              { rootPath: '', enabled: true, sortMode: 'title', sortDirection: 'ascending' },
+            ]),
+          ),
+          catalog: { tags: [] },
+        },
+      ]),
+    /外挂字幕角标设置无效/,
+  )
 })
 
 test('IPC request contracts return normalized safe request shapes', () => {

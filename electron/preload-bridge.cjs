@@ -19,6 +19,7 @@ function createPreloadBridge({ invoke, subscribe, getPathForFile }) {
     onLibraryThumbnailsUpdated: (listener) => subscribe(IPC_CHANNELS.libraryThumbnailsUpdated, listener),
     onGitHubUpdateProgress: (listener) => subscribe(IPC_CHANNELS.appGitHubUpdateProgress, listener),
     getLibrary: () => call(IPC_CHANNELS.libraryLoad),
+    getLibraryUsage: (libraryId) => call(IPC_CHANNELS.libraryGetUsage, libraryId),
     importMedia: (input) => call(IPC_CHANNELS.libraryImportMedia, input),
     clearImportedRecords: () => call(IPC_CHANNELS.libraryClearRecords),
     exportAppData: () => call(IPC_CHANNELS.appExportData),

@@ -18,6 +18,7 @@ test('maps every public invoke API to exactly one declared IPC channel', async (
     [IPC_CHANNELS.configSave]: () => bridge.saveConfig({}),
     [IPC_CHANNELS.importCreatePlan]: () => bridge.createImportPlan({}),
     [IPC_CHANNELS.libraryLoad]: () => bridge.getLibrary(),
+    [IPC_CHANNELS.libraryGetUsage]: () => bridge.getLibraryUsage('anime'),
     [IPC_CHANNELS.libraryImportMedia]: () => bridge.importMedia({}),
     [IPC_CHANNELS.libraryClearRecords]: () => bridge.clearImportedRecords(),
     [IPC_CHANNELS.appExportData]: () => bridge.exportAppData(),

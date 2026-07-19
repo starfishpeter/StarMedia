@@ -75,14 +75,12 @@ describe('renderer component smoke coverage', () => {
           selectedShelf={null}
           selectedIds={[]}
           viewMode="large"
-          primaryFilter="all"
-          tagFilter="all"
           sortMode="title"
           sortDirection="ascending"
-          primaryOptions={[]}
-          tagOptions={[]}
           sortOptions={[{ value: 'title', label: '标题' }]}
           onBrowseStateChange={noOp}
+          showExternalSubtitleBadges={false}
+          onShowExternalSubtitleBadgesChange={noOp}
           onReset={noOp}
           onClearSelection={noOp}
           onOpenAffiliation={noOp}
@@ -94,6 +92,7 @@ describe('renderer component smoke coverage', () => {
           onSelectMany={noOp}
           affiliationOverview={null}
           shelfOverview={null}
+          libraryUsageBytes={1024}
         />
         <ContainerOverview
           kind="affiliation"
@@ -108,8 +107,6 @@ describe('renderer component smoke coverage', () => {
         <DetailPanel
           item={video}
           availableTags={['动作']}
-          classifications={[]}
-          availableCreators={[]}
           onUpdateTags={noOp}
           onUpdateBookMetadata={async () => {}}
           onUpdateVideoEpisode={async () => video}
@@ -181,6 +178,25 @@ describe('renderer component smoke coverage', () => {
     expect(markup.indexOf('data-group-key="摇曳露营 第二季"')).toBeLessThan(markup.indexOf('data-group-key="摇曳露营 第三季"'))
   })
 
+  it('marks a collection with any supported external subtitle only when enabled', () => {
+    const items = [
+      {
+        ...video,
+        id: 'subtitled',
+        sidecars: [{ fileName: 'Episode 1.ass', sourcePath: 'C:\\Media\\Series\\Episode 1.ass', extension: '.ass', size: 8 }],
+      },
+      { ...video, id: 'plain', title: 'Episode 2' },
+    ]
+    const enabled = renderToStaticMarkup(
+      <AffiliationWall items={items} sortMode="title" sortDirection="ascending" showExternalSubtitleBadges onOpen={noOp} />,
+    )
+    const disabled = renderToStaticMarkup(<AffiliationWall items={items} sortMode="title" sortDirection="ascending" onOpen={noOp} />)
+
+    expect(enabled).toContain('external-subtitle-badge')
+    expect(enabled).toContain('外挂')
+    expect(disabled).not.toContain('external-subtitle-badge')
+  })
+
   it('uses video metadata for creator and general videos without exposing collection tag controls', () => {
     const creatorVideo: MediaItem = {
       ...video,
@@ -200,14 +216,12 @@ describe('renderer component smoke coverage', () => {
         selectedShelf={null}
         selectedIds={[]}
         viewMode="large"
-        primaryFilter="all"
-        tagFilter="all"
         sortMode="title"
         sortDirection="ascending"
-        primaryOptions={['不应显示']}
-        tagOptions={['动作']}
         sortOptions={[{ value: 'title', label: '标题' }]}
         onBrowseStateChange={noOp}
+        showExternalSubtitleBadges={false}
+        onShowExternalSubtitleBadgesChange={noOp}
         onReset={noOp}
         onClearSelection={noOp}
         onOpenAffiliation={noOp}
@@ -219,6 +233,7 @@ describe('renderer component smoke coverage', () => {
         onSelectMany={noOp}
         affiliationOverview={null}
         shelfOverview={null}
+        libraryUsageBytes={1024}
       />,
     )
     const creatorOverview = renderToStaticMarkup(
@@ -237,8 +252,6 @@ describe('renderer component smoke coverage', () => {
       <DetailPanel
         item={generalVideo}
         availableTags={['动作']}
-        classifications={[]}
-        availableCreators={[]}
         onUpdateTags={noOp}
         onUpdateBookMetadata={async () => {}}
         onUpdateVideoEpisode={async () => generalVideo}
@@ -251,7 +264,7 @@ describe('renderer component smoke coverage', () => {
     )
 
     expect(creatorLibrary).toContain('creator-thumb.jpg')
-    expect(creatorLibrary).not.toContain('不应显示')
+    expect(creatorLibrary).not.toContain('分类')
     expect(creatorLibrary).not.toContain('标签')
     expect(creatorOverview).not.toContain('container-tag-editor')
     expect(generalDetail).toContain('>标签<')

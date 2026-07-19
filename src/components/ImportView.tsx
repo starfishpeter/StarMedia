@@ -377,11 +377,15 @@ function ImportPlanPreview({
         </div>
       </div>
       <div className="plan-summary-grid">
-        <PlanMetric label="扫描文件" value={plan.totalFiles} />
+        <PlanMetric label="媒体项目" value={plan.mediaFileCount} />
+        <PlanMetric label="关联字幕" value={plan.sidecarCount} />
         <PlanMetric label="可导入" value={plan.acceptedCount} tone="ready" />
         <PlanMetric label="需配置" value={plan.blockedCount} tone="blocked" />
         <PlanMetric label="不支持" value={plan.unsupportedCount} tone="unsupported" />
       </div>
+      {plan.unattachedSidecarCount > 0 && (
+        <p className="plan-sidecar-note">有 {plan.unattachedSidecarCount} 个字幕未找到同名媒体文件，未列入导入。</p>
+      )}
       {selectedItems.length > 0 && (
         <div className="plan-bulk-actions">
           <strong>已选择 {selectedItems.length} 项</strong>

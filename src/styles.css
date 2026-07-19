@@ -846,6 +846,21 @@ select:focus {
   z-index: 300;
   min-width: 160px;
 }
+.toolbar-toggle {
+  height: 38px;
+  padding: 0 12px;
+  color: var(--text-secondary);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--panel-strong);
+  transition:
+    border-color 0.15s ease,
+    background 0.15s ease;
+}
+.toolbar-toggle:hover {
+  border-color: var(--accent-soft);
+  background: var(--panel);
+}
 
 .dropdown-prefix {
   min-width: 0;
@@ -908,6 +923,9 @@ select:focus {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(188px, 1fr));
   gap: 22px 20px;
+}
+.media-wall.media-selection-surface {
+  min-height: max(320px, calc(100vh - 250px));
 }
 .virtual-media-wall {
   position: relative;
@@ -1154,6 +1172,16 @@ select:focus {
 }
 .library-item-count {
   margin-right: 3px;
+  gap: 9px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.library-usage {
+  padding-left: 9px;
+  color: inherit;
+  font-size: inherit;
+  font-weight: inherit;
+  border-left: 1px solid var(--line);
 }
 .library-item-count.has-selection {
   color: var(--accent);
@@ -1213,6 +1241,21 @@ select:focus {
 }
 .affiliation-cover {
   aspect-ratio: 16 / 9;
+}
+.external-subtitle-badge {
+  position: absolute;
+  right: 7px;
+  bottom: 7px;
+  z-index: 1;
+  padding: 3px 6px;
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  border: 1px solid rgba(255, 255, 255, 0.34);
+  border-radius: 4px;
+  background: rgba(12, 16, 22, 0.76);
+  box-shadow: 0 1px 5px rgba(0, 0, 0, 0.3);
 }
 .affiliation-card:hover .cover-art {
   border-color: var(--accent-soft);
@@ -2070,10 +2113,17 @@ select:focus {
   line-height: 1.55;
 }
 .detail-actions {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
   gap: 7px;
   margin: 17px 0 20px;
+}
+.detail-actions > button {
+  grid-column: span 2;
+  justify-content: center;
+}
+.detail-actions > button:nth-child(-n + 2) {
+  grid-column: span 3;
 }
 .detail-grid {
   display: grid;
@@ -2787,123 +2837,6 @@ select:focus {
 .vocab-chip button:hover:not(:disabled) {
   color: var(--text);
   background: rgba(128, 128, 128, 0.12);
-}
-.management-tabs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  padding: 4px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  background: var(--glass-card-bg);
-}
-.management-tabs button {
-  min-height: 32px;
-  padding: 0 13px;
-  color: var(--text-secondary);
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 7px;
-  background: transparent;
-  transition:
-    background 0.15s ease,
-    color 0.15s ease;
-}
-.management-tabs button:hover {
-  color: var(--text);
-  background: rgba(128, 128, 128, 0.06);
-}
-.management-tabs button.active {
-  color: var(--on-accent);
-  background: var(--accent);
-}
-.classification-create {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-.classification-create > input {
-  width: 100%;
-  height: 36px;
-  padding: 0 11px;
-  color: var(--text);
-  outline: 0;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: var(--field);
-}
-.selectable-chips {
-  min-height: 0;
-  margin: 0;
-}
-.selectable-chips button {
-  padding: 4px 9px;
-  color: var(--text-secondary);
-  font-size: 11px;
-  border: 1px solid var(--line);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.03);
-}
-.selectable-chips button:hover {
-  color: var(--text);
-  border-color: var(--accent-soft);
-}
-.selectable-chips button.selected {
-  color: var(--on-accent);
-  border-color: var(--accent);
-  background: var(--accent);
-}
-.classification-list {
-  display: flex;
-  flex-direction: column;
-  gap: 7px;
-  margin-top: 14px;
-}
-.classification-list > div {
-  display: grid;
-  grid-template-columns: minmax(120px, 0.5fr) minmax(180px, 1fr) auto;
-  align-items: center;
-  gap: 10px;
-  padding: 9px 10px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: rgba(0, 0, 0, 0.08);
-}
-.classification-list strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-.classification-list span,
-.library-classification-grid span {
-  color: var(--muted);
-  font-size: 11px;
-}
-.library-classification-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 8px;
-}
-.library-classification-grid > div {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 7px;
-  min-height: 100px;
-  padding: 11px;
-  border: 1px solid var(--line);
-  border-radius: var(--radius-xs);
-  background: rgba(0, 0, 0, 0.08);
-}
-.library-classification-grid strong {
-  font-size: 13px;
-  font-weight: 600;
-}
-.library-classification-grid label {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--text-secondary);
-  font-size: 12px;
 }
 .bangumi-token-help {
   display: flex;

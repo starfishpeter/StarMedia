@@ -15,6 +15,7 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       theme: 'dark',
       cacheLimitMb: 4096,
       confirmBeforeClose: true,
+      showExternalSubtitleBadges: false,
       network: {
         proxyEnabled: false,
         proxyUrl: '',
@@ -29,9 +30,6 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       ),
       catalog: {
         tags: [],
-        classifications: [],
-        studios: [],
-        creators: [],
       },
     }
   }
@@ -57,52 +55,6 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
     return result.length > 0 ? result : fallback
   }
 
-  function normalizeClassifications(value, tags) {
-    const source = Array.isArray(value) ? value : []
-    const tagSet = new Set(tags)
-    const seenIds = new Set()
-    const seenNames = new Set()
-    const results = []
-
-    for (const [index, item] of source.entries()) {
-      if (!item || typeof item !== 'object') continue
-      const name = String(item.name ?? '').trim()
-      if (!name || name.length > 80 || seenNames.has(name)) continue
-      const id = String(item.id ?? `classification-${index + 1}`).trim() || `classification-${index + 1}`
-      if (seenIds.has(id)) continue
-      const itemTags = normalizeList(item.tags, []).filter((tag) => tagSet.has(tag))
-      const classificationLibraryIds = Array.isArray(item.libraryIds)
-        ? [...new Set(item.libraryIds.filter((libraryId) => libraryIds.includes(libraryId)))]
-        : []
-      seenIds.add(id)
-      seenNames.add(name)
-      results.push({ id, name, tags: itemTags, libraryIds: classificationLibraryIds })
-    }
-
-    return results
-  }
-
-  function migrateLegacyClassifications(vocabularies) {
-    const keyByLibrary = {
-      erAnime: 'erAnimeCategories',
-      anime: 'animeCategories',
-      creator: 'creatorCategories',
-      books: 'booksCategories',
-      comics: 'comicsCategories',
-      general: 'generalCategories',
-    }
-    const classifications = new Map()
-    for (const [libraryId, key] of Object.entries(keyByLibrary)) {
-      for (const name of normalizeList(vocabularies?.[key], [])) {
-        if (name === '未分类') continue
-        const current = classifications.get(name) ?? { id: `legacy-${classifications.size + 1}`, name, tags: [], libraryIds: [] }
-        if (!current.libraryIds.includes(libraryId)) current.libraryIds.push(libraryId)
-        classifications.set(name, current)
-      }
-    }
-    return [...classifications.values()]
-  }
-
   function sanitizeConfig(input) {
     const defaults = createDefaultConfig()
     const config = input && typeof input === 'object' ? input : {}
@@ -126,10 +78,6 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
     const network = config.network && typeof config.network === 'object' ? config.network : {}
     const scraping = config.scraping && typeof config.scraping === 'object' ? config.scraping : {}
     const tags = normalizeList(catalogInput.tags, normalizeList(vocabularies.tags, defaults.catalog.tags))
-    const classifications = normalizeClassifications(
-      Array.isArray(catalogInput.classifications) ? catalogInput.classifications : migrateLegacyClassifications(vocabularies),
-      tags,
-    )
 
     const rawProxyUrl = typeof network.proxyUrl === 'string' ? network.proxyUrl.trim() : ''
     let proxyEnabled = network.proxyEnabled === true
@@ -149,6 +97,8 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       theme: ['dark', 'light', 'blue'].includes(config.theme) ? config.theme : 'dark',
       cacheLimitMb: normalizeCacheLimitMb(config.cacheLimitMb, defaults.cacheLimitMb),
       confirmBeforeClose: typeof config.confirmBeforeClose === 'boolean' ? config.confirmBeforeClose : defaults.confirmBeforeClose,
+      showExternalSubtitleBadges:
+        typeof config.showExternalSubtitleBadges === 'boolean' ? config.showExternalSubtitleBadges : defaults.showExternalSubtitleBadges,
       network: { proxyEnabled, proxyUrl },
       scraping: {
         bangumiToken: typeof scraping.bangumiToken === 'string' ? scraping.bangumiToken.trim() : '',
@@ -164,9 +114,6 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       libraries,
       catalog: {
         tags,
-        classifications,
-        studios: normalizeList(catalogInput.studios, []),
-        creators: normalizeList(catalogInput.creators, []),
       },
     }
   }

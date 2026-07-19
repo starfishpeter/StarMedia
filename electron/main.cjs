@@ -435,10 +435,13 @@ async function createImportPlan(input) {
   })
   const candidateItemsTruncated = allCandidates.length > maxImportPlanItems
   const candidateItems = allCandidates.slice(0, maxImportPlanItems)
-  const attachedSidecars = new Set(candidateItems.flatMap((item) => item.sidecars ?? []).map((sidecar) => sidecar.sourcePath))
+  const attachedSidecars = new Set(allCandidates.flatMap((item) => item.sidecars ?? []).map((sidecar) => sidecar.sourcePath))
   const supportedExtensions = new Set([...supportedArchiveExtensions, ...supportedVideoExtensions])
   const unsupportedCount = scannedFiles.filter(
-    (file) => !supportedExtensions.has(file.extension) && !attachedSidecars.has(file.filePath),
+    (file) => !supportedExtensions.has(file.extension) && !supportedSidecarExtensions.has(file.extension),
+  ).length
+  const unattachedSidecarCount = scannedFiles.filter(
+    (file) => supportedSidecarExtensions.has(file.extension) && !attachedSidecars.has(file.filePath),
   ).length
 
   const acceptedCount = candidateItems.filter((item) => item.status === 'ready').length
@@ -489,6 +492,9 @@ async function createImportPlan(input) {
     configUpdatedAt: config.updatedAt,
     replaceableItems,
     totalFiles,
+    mediaFileCount: allCandidates.length,
+    sidecarCount: attachedSidecars.size,
+    unattachedSidecarCount,
     acceptedCount,
     blockedCount,
     unsupportedCount,
@@ -840,6 +846,30 @@ async function clearEmptyMediaDirectories() {
   return clearEmptyMediaDirectoriesForConfig({ config: await loadConfig(), libraryIds })
 }
 
+async function getDirectoryUsage(directoryPath) {
+  const root = String(directoryPath ?? '').trim()
+  if (!path.isAbsolute(root)) return 0
+
+  async function measure(entryPath) {
+    const stat = await fs.lstat(entryPath).catch(() => null)
+    if (!stat || stat.isSymbolicLink()) return 0
+    if (stat.isFile()) return stat.size
+    if (!stat.isDirectory()) return 0
+    const entries = await fs.readdir(entryPath).catch(() => [])
+    let bytes = 0
+    for (const entry of entries) bytes += await measure(path.join(entryPath, entry))
+    return bytes
+  }
+
+  return measure(root)
+}
+
+async function getLibraryUsage(libraryId) {
+  const config = await loadConfig()
+  const rootPath = String(config.libraries[libraryId]?.rootPath ?? '').trim()
+  return { rootPath, bytes: await getDirectoryUsage(rootPath) }
+}
+
 async function transferLibraryItems(input) {
   const [config, library] = await Promise.all([loadConfig(), loadLibrary()])
   const sourceRoots = new Map()
@@ -1110,6 +1140,8 @@ function registerIpc() {
     }),
   )
 
+  handle(IPC_CHANNELS.libraryGetUsage, async (_event, libraryId) => getLibraryUsage(libraryId))
+
   handle(IPC_CHANNELS.libraryImportMedia, async (event, input) =>
     withFileOperationLock(() => importMediaRecords(input, (progress) => event.sender.send(IPC_CHANNELS.importProgress, progress))),
   )
@@ -1320,6 +1352,7 @@ module.exports = {
   updateMediaInfo,
   clearCaches,
   clearEmptyMediaDirectories,
+  getLibraryUsage,
   regenerateAllThumbnails,
   verifyBangumiToken: () => scraperApplicationService.verifyBangumiToken(),
   openPathInExplorer,

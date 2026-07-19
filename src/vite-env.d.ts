@@ -5,18 +5,8 @@ type StarMediaTheme = 'dark' | 'light' | 'blue'
 type StarMediaSortMode = 'title' | 'releaseDate' | 'firstAired'
 type StarMediaSortDirection = 'ascending' | 'descending'
 
-interface StarMediaClassification {
-  id: string
-  name: string
-  tags: string[]
-  libraryIds: StarMediaConfigLibraryId[]
-}
-
 interface StarMediaCatalog {
   tags: string[]
-  classifications: StarMediaClassification[]
-  studios: string[]
-  creators: string[]
 }
 
 interface StarMediaLibraryConfig {
@@ -33,6 +23,7 @@ interface StarMediaConfig {
   theme: StarMediaTheme
   cacheLimitMb: number
   confirmBeforeClose: boolean
+  showExternalSubtitleBadges: boolean
   network: {
     proxyEnabled: boolean
     proxyUrl: string
@@ -63,6 +54,11 @@ interface StarMediaLibraryResult {
     operations?: StarMediaOperation[]
   }
   libraryPath: string
+}
+
+interface StarMediaLibraryUsage {
+  rootPath: string
+  bytes: number
 }
 
 interface StarMediaOperation {
@@ -200,6 +196,9 @@ interface StarMediaImportPlan {
   configUpdatedAt: string
   replaceableItems: StarMediaReplaceableItem[]
   totalFiles: number
+  mediaFileCount: number
+  sidecarCount: number
+  unattachedSidecarCount: number
   acceptedCount: number
   blockedCount: number
   unsupportedCount: number
@@ -253,6 +252,7 @@ interface Window {
     onLibraryThumbnailsUpdated?: (listener: (items: import('./data').MediaItem[]) => void) => () => void
     onGitHubUpdateProgress?: (listener: (progress: StarMediaGitHubUpdateProgress) => void) => () => void
     getLibrary?: () => Promise<StarMediaLibraryResult>
+    getLibraryUsage?: (libraryId: StarMediaConfigLibraryId) => Promise<StarMediaLibraryUsage>
     importMedia?: (input: {
       planId: string
       items: Array<{

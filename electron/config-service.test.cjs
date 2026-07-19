@@ -37,6 +37,7 @@ test('creates stable defaults for every known library without persisting on load
   assert.equal(config.updatedAt, fixedDate.toISOString())
   assert.equal(config.scraping.hanime1Endpoint, 'https://hanime1.com')
   assert.deepEqual(config.network, { proxyEnabled: false, proxyUrl: '' })
+  assert.equal(config.showExternalSubtitleBadges, false)
   assert.deepEqual(Object.keys(config.libraries), libraryIds)
   assert.equal(
     libraryIds.every(
@@ -51,12 +52,13 @@ test('creates stable defaults for every known library without persisting on load
   await assert.rejects(fs.access(paths.configPath), { code: 'ENOENT' })
 })
 
-test('sanitizes configuration values and migrates legacy classifications', async (t) => {
+test('sanitizes configuration values and removes obsolete classifications', async (t) => {
   const { service } = await createSandbox(t)
   const config = service.sanitizeConfig({
     mediaRoot: '  C:\\Media  ',
     theme: 'unsupported',
     cacheLimitMb: 4,
+    showExternalSubtitleBadges: true,
     network: { proxyEnabled: true, proxyUrl: ' 127.0.0.1:8390 ' },
     scraping: {
       anidbClient: ' obsolete-client ',
@@ -71,10 +73,7 @@ test('sanitizes configuration values and migrates legacy classifications', async
       animeCategories: ['番剧', '未分类'],
       booksCategories: ['番剧'],
     },
-    catalog: {
-      studios: [' Studio ', 'Studio'],
-      creators: [' Creator ', 'Creator'],
-    },
+    catalog: {},
     libraries: {
       anime: { rootPath: ' C:\\Anime ', enabled: false, sortMode: 'firstAired', sortDirection: 'descending' },
       books: { sortMode: 'releaseDate', sortDirection: 'ascending' },
@@ -85,15 +84,14 @@ test('sanitizes configuration values and migrates legacy classifications', async
   assert.equal(config.mediaRoot, 'C:\\Media')
   assert.equal(config.theme, 'dark')
   assert.equal(config.cacheLimitMb, 128)
+  assert.equal(config.showExternalSubtitleBadges, true)
   assert.equal(config.scraping.bangumiToken, 'token')
   assert.equal('anidbClient' in config.scraping, false)
   assert.equal(config.scraping.bangumiEndpoint, 'https://example.test')
   assert.equal(config.scraping.hanime1Endpoint, 'https://hanime1.com')
   assert.deepEqual(config.network, { proxyEnabled: true, proxyUrl: 'http://127.0.0.1:8390' })
   assert.deepEqual(config.catalog.tags, ['动作', '科幻'])
-  assert.deepEqual(config.catalog.studios, ['Studio'])
-  assert.deepEqual(config.catalog.creators, ['Creator'])
-  assert.deepEqual(config.catalog.classifications, [{ id: 'legacy-1', name: '番剧', tags: [], libraryIds: ['anime', 'books'] }])
+  assert.equal('classifications' in config.catalog, false)
   assert.deepEqual(config.libraries.anime, {
     rootPath: 'C:\\Anime',
     enabled: false,

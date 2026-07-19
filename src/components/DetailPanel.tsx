@@ -1,7 +1,7 @@
 import { BookOpenText, ExternalLink, Play, Trash2, X } from 'lucide-react'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { libraryById, type MediaItem } from '../data'
-import { getEpisodeCover, getMediaAffiliation, getMediaClassifications, getMediaEpisode, getMediaShelf } from '../domain/media'
+import { getEpisodeCover, getMediaAffiliation, getMediaEpisode, getMediaShelf } from '../domain/media'
 import { TagEditor } from './TagEditor'
 
 type VideoPlaybackAvailability = 'checking' | 'supported' | 'unsupported'
@@ -14,15 +14,11 @@ function getVideoFormat(item: MediaItem) {
 export function DetailPanel({
   item,
   availableTags,
-  classifications,
-  availableCreators,
-  availableAffiliations = [],
   onUpdateTags,
   onAddTag,
   onUpdateBookMetadata,
   onUpdateVideoEpisode,
   onUpdateVideoReleaseDate,
-  onMoveVideo,
   onTrash,
   onReplaceVideo,
   onClose,
@@ -32,15 +28,11 @@ export function DetailPanel({
 }: {
   item: MediaItem
   availableTags: string[]
-  classifications: StarMediaClassification[]
-  availableCreators: string[]
-  availableAffiliations?: string[]
   onUpdateTags: (item: MediaItem, tags: string[]) => void
   onAddTag?: (item: MediaItem, tag: string) => Promise<void>
   onUpdateBookMetadata: (item: MediaItem, metadata: { creator: string; releaseDate: string }) => Promise<void>
   onUpdateVideoEpisode: (item: MediaItem, episode: string) => Promise<MediaItem | undefined>
   onUpdateVideoReleaseDate: (item: MediaItem, releaseDate: string) => Promise<MediaItem | undefined>
-  onMoveVideo?: (item: MediaItem, affiliation: string) => Promise<void>
   onTrash?: (item: MediaItem) => Promise<void>
   onReplaceVideo?: (item: MediaItem) => void
   onClose: () => void
@@ -59,8 +51,6 @@ export function DetailPanel({
   const [episode, setEpisode] = useState(itemEpisode)
   const [editingEpisode, setEditingEpisode] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [moving, setMoving] = useState(false)
-  const [targetAffiliation, setTargetAffiliation] = useState('')
 
   useEffect(() => {
     setCreator(item.creator ?? '')
@@ -68,7 +58,6 @@ export function DetailPanel({
     setEpisode(itemEpisode)
     setEditingEpisode(false)
     setEditing(false)
-    setTargetAffiliation('')
   }, [item.id, item.creator, item.releaseDate, itemEpisode, item.title])
 
   useEffect(() => {
@@ -156,6 +145,12 @@ export function DetailPanel({
                 应用内播放
               </button>
             )}
+            {!isBook && (
+              <button className="secondary-button" onClick={() => onOpenExternal(item)}>
+                <ExternalLink size={16} />
+                外部播放
+              </button>
+            )}
             {isBook && (
               <button className="secondary-button" onClick={() => setEditing((current) => !current)}>
                 {editing ? '收起资料' : '编辑资料'}
@@ -165,10 +160,6 @@ export function DetailPanel({
               <>
                 <button className="secondary-button" onClick={() => setEditingEpisode((current) => !current)}>
                   {editingEpisode ? '收起选集资料' : '编辑选集'}
-                </button>
-                <button className="secondary-button" onClick={() => onOpenExternal(item)}>
-                  <ExternalLink size={16} />
-                  外部播放
                 </button>
                 <button className="secondary-button" onClick={() => onReplaceVideo?.(item)}>
                   替换文件
@@ -212,59 +203,16 @@ export function DetailPanel({
               </button>
             </form>
           )}
-          {!isBook && onMoveVideo && (
-            <form
-              className="detail-episode-editor"
-              onSubmit={(event) => {
-                event.preventDefault()
-                if (!targetAffiliation.trim() || targetAffiliation.trim() === getMediaAffiliation(item)) return
-                setMoving(true)
-                void onMoveVideo(item, targetAffiliation.trim())
-                  .catch(() => {})
-                  .finally(() => setMoving(false))
-              }}
-            >
-              <label>
-                <span>移动到其他合集</span>
-                <input
-                  list="detail-affiliations"
-                  value={targetAffiliation}
-                  onChange={(event) => setTargetAffiliation(event.target.value)}
-                  placeholder="输入已有或新的合集名称"
-                  maxLength={200}
-                />
-              </label>
-              <datalist id="detail-affiliations">
-                {availableAffiliations
-                  .filter((value) => value !== getMediaAffiliation(item))
-                  .map((value) => (
-                    <option key={value} value={value} />
-                  ))}
-              </datalist>
-              <button
-                className="secondary-button small-button"
-                type="submit"
-                disabled={moving || !targetAffiliation.trim() || targetAffiliation.trim() === getMediaAffiliation(item)}
-              >
-                {moving ? '移动中…' : '移动选集'}
-              </button>
-            </form>
-          )}
           {isBook && editing && (
             <div className="detail-metadata-editor">
               <label>
                 <span>创作者</span>
-                <input list="detail-creators" value={creator} onChange={(event) => setCreator(event.target.value)} placeholder="可留空" />
+                <input value={creator} onChange={(event) => setCreator(event.target.value)} placeholder="可留空" />
               </label>
               <label>
                 <span>发行日期</span>
                 <input value={releaseDate} onChange={(event) => setReleaseDate(event.target.value)} placeholder="YYYY-MM-DD，可留空" />
               </label>
-              <datalist id="detail-creators">
-                {availableCreators.map((value) => (
-                  <option key={value} value={value} />
-                ))}
-              </datalist>
               <button className="primary-button small-button" onClick={() => void saveBookMetadata()} disabled={saving}>
                 {saving ? '保存中…' : '保存资料'}
               </button>
@@ -325,16 +273,6 @@ export function DetailPanel({
             onChange={(tags) => onUpdateTags(item, tags)}
             onAddTag={onAddTag ? (tag) => onAddTag(item, tag) : undefined}
           />
-          <div className="detail-tags">
-            <span>分类（由标签推导）</span>
-            <div>
-              {getMediaClassifications(item, classifications).length > 0 ? (
-                getMediaClassifications(item, classifications).map((value) => <em key={value}>{value}</em>)
-              ) : (
-                <small>尚未匹配分类。</small>
-              )}
-            </div>
-          </div>
         </div>
       </aside>
     </div>

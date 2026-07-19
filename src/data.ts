@@ -9,7 +9,6 @@ export interface LibraryDefinition {
   id: LibraryId
   label: string
   description: string
-  primaryLabel: string
   icon: LucideIcon
   color: string
 }
@@ -60,12 +59,12 @@ export interface MediaItem {
 }
 
 export const libraries: LibraryDefinition[] = [
-  { id: 'erAnime', label: '里番', description: '按合集浏览视频作品', primaryLabel: '分类', icon: Clapperboard, color: '#db4f87' },
-  { id: 'anime', label: '番剧', description: '按合集浏览视频作品', primaryLabel: '分类', icon: Tv, color: '#6f8df7' },
-  { id: 'creator', label: '原创', description: '以创作者为合集浏览作品', primaryLabel: '分类', icon: Sparkles, color: '#d69745' },
-  { id: 'general', label: '综合', description: '按合集浏览视频作品', primaryLabel: '分类', icon: MonitorPlay, color: '#37a894' },
-  { id: 'books', label: '本子', description: '按书架浏览并直接阅读压缩包', primaryLabel: '分类', icon: BookOpen, color: '#9b66df' },
-  { id: 'comics', label: '漫画', description: '按书架浏览并直接阅读压缩包', primaryLabel: '分类', icon: BookOpen, color: '#4e9bdb' },
+  { id: 'erAnime', label: '里番', description: '按合集浏览视频作品', icon: Clapperboard, color: '#db4f87' },
+  { id: 'anime', label: '番剧', description: '按合集浏览视频作品', icon: Tv, color: '#6f8df7' },
+  { id: 'creator', label: '原创', description: '以创作者为合集浏览作品', icon: Sparkles, color: '#d69745' },
+  { id: 'general', label: '综合', description: '按合集浏览视频作品', icon: MonitorPlay, color: '#37a894' },
+  { id: 'books', label: '本子', description: '按书架浏览并直接阅读压缩包', icon: BookOpen, color: '#9b66df' },
+  { id: 'comics', label: '漫画', description: '按书架浏览并直接阅读压缩包', icon: BookOpen, color: '#4e9bdb' },
 ]
 
 export const libraryById = Object.fromEntries(libraries.map((library) => [library.id, library])) as Record<LibraryId, LibraryDefinition>

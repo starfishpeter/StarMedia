@@ -283,8 +283,21 @@ test('creates import plans through trusted IPC without treating missing sources 
 
   const plan = await handlers.get(IPC_CHANNELS.importCreatePlan)(event, { sourcePaths: [sourcePath], targetLibrary: 'general' })
   assert.equal(plan.acceptedCount, 1)
+  assert.equal(plan.mediaFileCount, 1)
+  assert.equal(plan.sidecarCount, 0)
   assert.equal(plan.items[0].status, 'ready')
   assert.equal(plan.items[0].targetPath, path.join(libraryRoot, 'episode', 'episode.mp4'))
+
+  await fsPromises.writeFile(path.join(path.dirname(sourcePath), 'episode.ass'), 'subtitle')
+  const subtitledPlan = await handlers.get(IPC_CHANNELS.importCreatePlan)(event, {
+    sourcePaths: [path.dirname(sourcePath)],
+    targetLibrary: 'general',
+  })
+  assert.equal(subtitledPlan.mediaFileCount, 1)
+  assert.equal(subtitledPlan.sidecarCount, 1)
+  assert.equal(subtitledPlan.unattachedSidecarCount, 0)
+  assert.equal(subtitledPlan.unsupportedCount, 0)
+  assert.equal(subtitledPlan.items[0].sidecars?.[0]?.fileName, 'episode.ass')
 
   const missingPlan = await handlers.get(IPC_CHANNELS.importCreatePlan)(event, {
     sourcePaths: [path.join(mediaRoot, 'source', 'missing.mp4')],
@@ -347,4 +360,21 @@ test('creates import plans through trusted IPC without treating missing sources 
     }),
     /IPC 请求无效/,
   )
+})
+
+test('reports the configured library root usage, including unindexed companion files', async (t) => {
+  const { handlers, main, windows } = loadMainWithElectronMock(t)
+  main.createWindow()
+  main.registerIpc()
+  const event = { sender: windows[0].webContents, senderFrame: windows[0].webContents.mainFrame }
+  const rootPath = path.join(os.tmpdir(), `starmedia-main-library-usage-${Date.now()}`)
+  t.after(() => fsPromises.rm(rootPath, { recursive: true, force: true }))
+  await fsPromises.mkdir(path.join(rootPath, 'Series'), { recursive: true })
+  await fsPromises.writeFile(path.join(rootPath, 'Series', 'episode.mp4'), 'video')
+  await fsPromises.writeFile(path.join(rootPath, 'Series', 'episode.ass'), 'subtitle')
+  const config = await main.loadConfig()
+  config.libraries.anime.rootPath = rootPath
+  await handlers.get(IPC_CHANNELS.configSave)(event, config)
+
+  assert.deepEqual(await handlers.get(IPC_CHANNELS.libraryGetUsage)(event, 'anime'), { rootPath, bytes: 13 })
 })

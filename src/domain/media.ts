@@ -3,12 +3,6 @@ import type { LibraryId, MediaItem } from '../data'
 export type SortMode = 'title' | 'releaseDate' | 'firstAired'
 export type SortDirection = 'ascending' | 'descending'
 
-export interface MediaClassification {
-  name: string
-  tags: string[]
-  libraryIds: LibraryId[]
-}
-
 const archiveLibraryIds = new Set<LibraryId>(['books', 'comics'])
 
 const chineseEpisodeDigits: Record<string, number> = {
@@ -123,17 +117,6 @@ export function compareMediaEpisodes(left: MediaItem, right: MediaItem) {
 
 export function getMediaShelf(item: MediaItem) {
   return item.shelf?.trim() || '未放入书架'
-}
-
-export function getMediaClassifications(item: MediaItem, classifications: MediaClassification[]) {
-  return classifications
-    .filter(
-      (classification) =>
-        classification.libraryIds.includes(item.library) &&
-        classification.tags.length > 0 &&
-        classification.tags.every((tag) => item.tags.includes(tag)),
-    )
-    .map((classification) => classification.name)
 }
 
 export function getEpisodeCover(item: MediaItem) {

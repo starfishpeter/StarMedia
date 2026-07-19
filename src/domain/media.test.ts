@@ -4,7 +4,6 @@ import {
   compareMediaItems,
   getEpisodeSortNumber,
   getMediaAffiliation,
-  getMediaClassifications,
   getMediaShelf,
   isArchiveLibrary,
   parseChineseEpisodeNumber,
@@ -56,18 +55,11 @@ describe('media domain rules', () => {
     expect(episodes.sort(compareMediaEpisodes).map((item) => item.id)).toEqual(['first', 'second', 'third'])
   })
 
-  it('sorts dates with missing values last and applies classification tags conjunctively', () => {
+  it('sorts dates with missing values last', () => {
     const dated = createItem({ id: 'dated', title: 'B', releaseDate: '2025-01-01' })
     const undated = createItem({ id: 'undated', title: 'A' })
     expect(
       [undated, dated].sort((left, right) => compareMediaItems(left, right, 'releaseDate', 'ascending')).map((item) => item.id),
     ).toEqual(['dated', 'undated'])
-
-    expect(
-      getMediaClassifications(createItem({ tags: ['动作', '科幻'] }), [
-        { name: '动作科幻', libraryIds: ['anime'], tags: ['动作', '科幻'] },
-        { name: '仅动作', libraryIds: ['anime'], tags: ['动作', '奇幻'] },
-      ]),
-    ).toEqual(['动作科幻'])
   })
 })
