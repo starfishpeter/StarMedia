@@ -103,6 +103,7 @@ describe('renderer component smoke coverage', () => {
           onOpen={noOp}
           onSaveNote={noOp}
           onSaveTags={noOp}
+          onAssignBangumiEpisodes={async () => 0}
         />
         <DetailPanel
           item={video}
@@ -111,12 +112,22 @@ describe('renderer component smoke coverage', () => {
           onUpdateBookMetadata={async () => {}}
           onUpdateVideoEpisode={async () => video}
           onUpdateVideoReleaseDate={async () => video}
+          onApplyBangumiEpisode={async () => video}
+          onOpenExternalUrl={noOp}
           onClose={noOp}
           onRead={noOp}
           onPlayVideo={noOp}
           onOpenExternal={noOp}
         />
-        <MediaBatchMenu position={{ x: 0, y: 0 }} items={[book]} onApplyShelf={noOp} onTransfer={noOp} onTrash={noOp} onClose={noOp} />
+        <MediaBatchMenu
+          position={{ x: 0, y: 0 }}
+          items={[book]}
+          onApplyShelf={noOp}
+          onTransfer={noOp}
+          onOpenInFileManager={noOp}
+          onTrash={noOp}
+          onClose={noOp}
+        />
         <BookReader
           item={book}
           sessionId="session"
@@ -146,8 +157,10 @@ describe('renderer component smoke coverage', () => {
     expect(markup).toContain('上传文件/文件夹')
     expect(markup).not.toContain('扫描会查找六个受管理媒体库')
     expect(markup).toContain('Series')
+    expect(markup).toContain('collection-note clamped')
     expect(markup).toContain('1 / 1')
     expect(markup).toContain('移入回收站')
+    expect(markup).toContain('在文件管理器中打开')
     expect(markup).toContain('字幕：关闭')
     expect(markup).toContain('English')
     expect(markup).toContain('格式')
@@ -156,6 +169,32 @@ describe('renderer component smoke coverage', () => {
     expect(markup).toContain('24:00')
     expect(markup).toContain('适应窗口')
     expect(markup).toContain('原始尺寸')
+    expect(markup).toContain('toolbar-switch')
+    expect(markup).toContain('>关<')
+    expect(markup).toContain('额外信息')
+    expect(markup).toContain('Bangumi 单集')
+  })
+
+  it('offers transactional renaming only when a Bangumi episode title is available', () => {
+    const markup = renderToStaticMarkup(
+      <DetailPanel
+        item={{ ...video, episode: '#01', episodeTitle: 'Bangumi 原标题' }}
+        availableTags={[]}
+        onUpdateTags={noOp}
+        onUpdateBookMetadata={async () => {}}
+        onUpdateVideoEpisode={async () => video}
+        onUpdateVideoReleaseDate={async () => video}
+        onApplyBangumiEpisode={async () => video}
+        onOpenExternalUrl={noOp}
+        onClose={noOp}
+        onRead={noOp}
+        onPlayVideo={noOp}
+        onOpenExternal={noOp}
+      />,
+    )
+
+    expect(markup).toContain('使用 Bangumi 标题重命名')
+    expect(markup).not.toContain('不会改动文件名或合集简介')
   })
 
   it('keeps media library navigation in the configured order', () => {
@@ -195,6 +234,23 @@ describe('renderer component smoke coverage', () => {
     expect(enabled).toContain('external-subtitle-badge')
     expect(enabled).toContain('外挂')
     expect(disabled).not.toContain('external-subtitle-badge')
+  })
+
+  it('does not offer media-library transfer for a single video selection', () => {
+    const markup = renderToStaticMarkup(
+      <MediaBatchMenu
+        position={{ x: 0, y: 0 }}
+        items={[video]}
+        onApplyShelf={noOp}
+        onTransfer={noOp}
+        onOpenInFileManager={noOp}
+        onTrash={noOp}
+        onClose={noOp}
+      />,
+    )
+
+    expect(markup).toContain('在文件管理器中打开')
+    expect(markup).not.toContain('转移到媒体库')
   })
 
   it('uses video metadata for creator and general videos without exposing collection tag controls', () => {
@@ -256,6 +312,8 @@ describe('renderer component smoke coverage', () => {
         onUpdateBookMetadata={async () => {}}
         onUpdateVideoEpisode={async () => generalVideo}
         onUpdateVideoReleaseDate={async () => generalVideo}
+        onApplyBangumiEpisode={async () => generalVideo}
+        onOpenExternalUrl={noOp}
         onClose={noOp}
         onRead={noOp}
         onPlayVideo={noOp}
@@ -285,14 +343,15 @@ describe('renderer component smoke coverage', () => {
     expect(markup).not.toContain('content-visibility')
   })
 
-  it('keeps large tag catalogs inside a compact picker instead of rendering one button per tag', () => {
+  it('keeps large tag catalogs out of the initial markup until the user enters a query', () => {
     const availableTags = Array.from({ length: 120 }, (_, index) => `标签 ${index + 1}`)
     const markup = renderToStaticMarkup(
       <TagEditor tags={['已选择']} availableTags={availableTags} onChange={noOp} onAddTag={async () => {}} />,
     )
 
     expect(markup.match(/class="tag-editor-chip"/g)).toHaveLength(1)
-    expect(markup.match(/<option/g)).toHaveLength(120)
+    expect(markup).not.toContain('<option')
+    expect(markup).not.toContain('tag-editor-suggestions')
     expect(markup).toContain('添加更多标签')
   })
 })

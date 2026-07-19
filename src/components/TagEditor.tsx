@@ -1,5 +1,5 @@
 import { X } from 'lucide-react'
-import { useId, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 
 export function TagEditor({
   tags,
@@ -16,12 +16,17 @@ export function TagEditor({
   onChange: (tags: string[]) => void
   onAddTag?: (tag: string) => Promise<void>
 }) {
-  const datalistId = `tag-suggestions-${useId().replaceAll(':', '')}`
   const [value, setValue] = useState('')
+  const [focused, setFocused] = useState(false)
   const [saving, setSaving] = useState(false)
+  const normalizedQuery = value.trim().toLocaleLowerCase()
   const suggestions = useMemo(
-    () => availableTags.filter((tag) => !tags.includes(tag)).sort((left, right) => left.localeCompare(right, 'zh-CN')),
-    [availableTags, tags],
+    () =>
+      availableTags
+        .filter((tag) => !tags.includes(tag) && normalizedQuery && tag.toLocaleLowerCase().includes(normalizedQuery))
+        .sort((left, right) => left.localeCompare(right, 'zh-CN'))
+        .slice(0, 8),
+    [availableTags, normalizedQuery, tags],
   )
 
   async function addTag() {
@@ -62,18 +67,33 @@ export function TagEditor({
           void addTag().catch(() => {})
         }}
       >
-        <input
-          value={value}
-          onChange={(event) => setValue(event.target.value)}
-          placeholder={tags.length === 0 ? '输入或选择标签' : '添加更多标签…'}
-          maxLength={80}
-          list={datalistId}
-        />
-        <datalist id={datalistId}>
-          {suggestions.map((suggestion) => (
-            <option key={suggestion} value={suggestion} />
-          ))}
-        </datalist>
+        <div className="tag-editor-input-wrap">
+          <input
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={tags.length === 0 ? '输入标签' : '添加更多标签…'}
+            maxLength={80}
+            aria-autocomplete="list"
+            aria-expanded={focused && suggestions.length > 0}
+          />
+          {focused && suggestions.length > 0 && (
+            <div className="tag-editor-suggestions" role="listbox" aria-label="标签建议">
+              {suggestions.map((suggestion) => (
+                <button
+                  type="button"
+                  role="option"
+                  key={suggestion}
+                  onMouseDown={(event) => event.preventDefault()}
+                  onClick={() => setValue(suggestion)}
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
         <button type="submit" className="secondary-button tiny-button" disabled={saving || !value.trim() || tags.includes(value.trim())}>
           {saving ? '保存中…' : '添加'}
         </button>

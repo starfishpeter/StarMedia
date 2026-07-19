@@ -1,4 +1,4 @@
-import { ChevronLeft, UploadCloud } from 'lucide-react'
+import { ChevronLeft, ExternalLink, UploadCloud } from 'lucide-react'
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { MediaItem } from '../data'
 import { compareMediaEpisodes, getEpisodeCover, getMediaEpisode } from '../domain/media'
@@ -39,6 +39,8 @@ export function ContainerOverview({
   onSearchBangumi,
   onPreviewBangumi,
   onApplyBangumi,
+  onAssignBangumiEpisodes,
+  onOpenExternalUrl,
   onSearchHanime,
   onPreviewHanime,
   onApplyHanime,
@@ -62,6 +64,8 @@ export function ContainerOverview({
   onSearchBangumi?: (query: string) => Promise<StarMediaBangumiSubject[]>
   onPreviewBangumi?: (subjectId: number) => Promise<StarMediaScrapePreview>
   onApplyBangumi?: (item: MediaItem, subjectId: number, fields: StarMediaScrapeFields) => Promise<StarMediaBangumiSubject | undefined>
+  onAssignBangumiEpisodes?: (item: MediaItem, subjectId: number) => Promise<number>
+  onOpenExternalUrl?: (url: string) => void
   onSearchHanime?: (query: string, source: 'freeanimehentai' | 'hanime1') => Promise<StarMediaHanimeSubject[]>
   onPreviewHanime?: (subjectId: number, source: 'freeanimehentai' | 'hanime1') => Promise<StarMediaScrapePreview>
   onApplyHanime?: (
@@ -116,10 +120,14 @@ export function ContainerOverview({
   const [scraperOpen, setScraperOpen] = useState(false)
   const [scraperError, setScraperError] = useState('')
   const [scraperSuccess, setScraperSuccess] = useState('')
+  const [assigningEpisodes, setAssigningEpisodes] = useState(false)
   const [editingNote, setEditingNote] = useState(false)
+  const [noteExpanded, setNoteExpanded] = useState(false)
+  const [noteExpandable, setNoteExpandable] = useState(false)
   const [editingMetadata, setEditingMetadata] = useState(false)
   const [metadataSaving, setMetadataSaving] = useState(false)
   const [metadataError, setMetadataError] = useState('')
+  const noteRef = useRef<HTMLParagraphElement | null>(null)
 
   useEffect(() => setDraftNote(representative?.note ?? ''), [name, representative?.id, representative?.note])
   useEffect(
@@ -155,12 +163,25 @@ export function ContainerOverview({
     setLastAppliedField(null)
     setScraperError('')
     setScraperSuccess('')
+    setAssigningEpisodes(false)
     setScraperOpen(false)
     setEditingNote(false)
+    setNoteExpanded(false)
+    setNoteExpandable(false)
     setEditingMetadata(false)
     setMetadataError('')
   })
   useEffect(() => resetContainerState(), [representative?.id])
+  useEffect(() => {
+    if (editingNote || noteExpanded) return
+    const note = noteRef.current
+    if (!note) return
+    const updateExpandable = () => setNoteExpandable(note.scrollHeight > note.clientHeight + 1)
+    updateExpandable()
+    const observer = typeof ResizeObserver === 'undefined' ? null : new ResizeObserver(updateExpandable)
+    observer?.observe(note)
+    return () => observer?.disconnect()
+  }, [editingNote, name, noteExpanded, representative?.note])
   if (!representative) return null
 
   const label = kind === 'affiliation' ? '合集' : '书架'
@@ -289,6 +310,26 @@ export function ContainerOverview({
       return
     }
     await prepareScrapePreview('bangumi', subjectId)
+  }
+
+  async function assignBangumiEpisodes() {
+    const subjectId = Number(bangumiId.trim())
+    if (!Number.isInteger(subjectId) || subjectId <= 0) {
+      setScraperError('请输入有效的 Bangumi ID。')
+      return
+    }
+    if (!onAssignBangumiEpisodes) return
+    setAssigningEpisodes(true)
+    setScraperError('')
+    setScraperSuccess('')
+    try {
+      const assignedCount = await onAssignBangumiEpisodes(representative, subjectId)
+      setScraperSuccess(assignedCount > 0 ? `已分配 ${assignedCount} 个正篇章节。` : '没有可自动分配的正篇章节。')
+    } catch (error) {
+      setScraperError(error instanceof Error ? error.message : '分配 Bangumi 章节失败。')
+    } finally {
+      setAssigningEpisodes(false)
+    }
   }
 
   async function applyHanimeId(event: FormEvent<HTMLFormElement>, source: 'freeanimehentai' | 'hanime1') {
@@ -456,7 +497,23 @@ export function ContainerOverview({
                 </div>
               </div>
             )}
-            {!editingNote && representative.note?.trim() && <p className="collection-note">{representative.note}</p>}
+            {!editingNote && representative.note?.trim() && (
+              <div className="collection-note-block">
+                <p ref={noteRef} className={`collection-note ${noteExpanded ? 'expanded' : 'clamped'}`}>
+                  {representative.note}
+                </p>
+                {(noteExpandable || noteExpanded) && (
+                  <button
+                    type="button"
+                    className="text-button collection-note-toggle"
+                    aria-expanded={noteExpanded}
+                    onClick={() => setNoteExpanded((current) => !current)}
+                  >
+                    {noteExpanded ? '收起简介' : '展开简介'}
+                  </button>
+                )}
+              </div>
+            )}
             {editingNote && (
               <div className="collection-note-editor">
                 <textarea
@@ -554,6 +611,23 @@ export function ContainerOverview({
               <button type="submit" className="primary-button small-button" disabled={scraperStatus !== 'idle' || !bangumiId.trim()}>
                 选择字段
               </button>
+              <button
+                type="button"
+                className="secondary-button small-button"
+                disabled={scraperStatus !== 'idle' || assigningEpisodes || !bangumiId.trim()}
+                onClick={() => void assignBangumiEpisodes()}
+              >
+                {assigningEpisodes ? '分配中…' : '分配章节'}
+              </button>
+              <button
+                type="button"
+                className="secondary-button small-button"
+                disabled={assigningEpisodes || !bangumiId.trim()}
+                onClick={() => onOpenExternalUrl?.(`https://bgm.tv/subject/${bangumiId.trim()}`)}
+              >
+                <ExternalLink size={14} />
+                访问原页
+              </button>
             </form>
           )}
           {scraperSource === 'freeanimehentai' && (
@@ -641,26 +715,28 @@ export function ContainerOverview({
                     onChange={(value) => setScrapeDraft((current) => ({ ...current, originalTitle: value }))}
                     onApply={() => void applyScrapeField('originalTitle')}
                   />
-                  <ScrapeValueRow
-                    label="制作公司"
-                    value={scrapeDraft.studio}
-                    maxLength={200}
-                    applying={applyingField === 'studio'}
-                    applied={lastAppliedField === 'studio' || lastAppliedField === 'all'}
-                    disabled={scraperStatus !== 'idle'}
-                    onChange={(value) => setScrapeDraft((current) => ({ ...current, studio: value }))}
-                    onApply={() => void applyScrapeField('studio')}
-                  />
-                  <ScrapeValueRow
-                    label="第一话首播日期"
-                    value={scrapeDraft.firstAiredAt}
-                    maxLength={40}
-                    applying={applyingField === 'firstAiredAt'}
-                    applied={lastAppliedField === 'firstAiredAt' || lastAppliedField === 'all'}
-                    disabled={scraperStatus !== 'idle'}
-                    onChange={(value) => setScrapeDraft((current) => ({ ...current, firstAiredAt: value }))}
-                    onApply={() => void applyScrapeField('firstAiredAt')}
-                  />
+                  <div className="scrape-meta-field-grid">
+                    <ScrapeValueRow
+                      label="制作公司"
+                      value={scrapeDraft.studio}
+                      maxLength={200}
+                      applying={applyingField === 'studio'}
+                      applied={lastAppliedField === 'studio' || lastAppliedField === 'all'}
+                      disabled={scraperStatus !== 'idle'}
+                      onChange={(value) => setScrapeDraft((current) => ({ ...current, studio: value }))}
+                      onApply={() => void applyScrapeField('studio')}
+                    />
+                    <ScrapeValueRow
+                      label="第一话首播日期"
+                      value={scrapeDraft.firstAiredAt}
+                      maxLength={40}
+                      applying={applyingField === 'firstAiredAt'}
+                      applied={lastAppliedField === 'firstAiredAt' || lastAppliedField === 'all'}
+                      disabled={scraperStatus !== 'idle'}
+                      onChange={(value) => setScrapeDraft((current) => ({ ...current, firstAiredAt: value }))}
+                      onApply={() => void applyScrapeField('firstAiredAt')}
+                    />
+                  </div>
                   <ScrapeValueRow
                     label="简介"
                     value={scrapeDraft.note}

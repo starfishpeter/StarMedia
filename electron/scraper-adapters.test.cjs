@@ -48,12 +48,42 @@ test('searches and previews Bangumi subjects through the injected network port',
         summary: '<p>简介<br>第二行</p>',
         infobox: [{ key: '动画制作', value: 'Studio' }],
       })
+    if (url.includes('/episodes?subject_id=7'))
+      return jsonResponse({
+        data: [
+          {
+            id: 71,
+            subject_id: 7,
+            type: 0,
+            ep: 1,
+            sort: 1,
+            name: 'Episode',
+            name_cn: '第一集',
+            airdate: '2026-01-02',
+            desc: '<b>单集简介</b>',
+          },
+        ],
+      })
+    if (url.endsWith('/episodes/71'))
+      return jsonResponse({
+        id: 71,
+        subject_id: 7,
+        type: 0,
+        ep: 1,
+        sort: 1,
+        name: 'Episode',
+        name_cn: '第一集',
+        airdate: '2026-01-02',
+        desc: '<b>单集简介</b>',
+      })
     if (url.endsWith('/me')) return jsonResponse({ nickname: 'tester' })
     throw new Error(`unexpected URL: ${url}`)
   })
 
   const search = await adapters.searchBangumiSubjects({ query: 'Original' })
   const preview = await adapters.previewBangumiSubject({ subjectId: 7 })
+  const episodes = await adapters.getBangumiEpisodes(7)
+  const episode = await adapters.getBangumiEpisode(71)
   const token = await adapters.verifyBangumiToken()
 
   assert.deepEqual(search.subjects, [
@@ -62,6 +92,21 @@ test('searches and previews Bangumi subjects through the injected network port',
   assert.equal(preview.preview.studio, 'Studio')
   assert.equal(preview.preview.note, '简介\n第二行')
   assert.equal(token.userName, 'tester')
+  assert.deepEqual(episodes, [
+    {
+      id: 71,
+      subjectId: 7,
+      type: 0,
+      ep: 1,
+      sort: 1,
+      name: 'Episode',
+      nameCn: '第一集',
+      airdate: '2026-01-02',
+      summary: '单集简介',
+      url: 'https://bgm.tv/ep/71',
+    },
+  ])
+  assert.deepEqual(episode, episodes[0])
   assert.equal(token.expiresAt, '2033-05-18T03:33:20.000Z')
   assert.equal(calls[0].options.headers.Authorization, 'Bearer header.eyJleHAiOjIwMDAwMDAwMDB9.signature')
 })

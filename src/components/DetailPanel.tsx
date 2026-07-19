@@ -1,7 +1,7 @@
-import { BookOpenText, ExternalLink, Play, Trash2, X } from 'lucide-react'
+import { BookOpenText, ExternalLink, FilePenLine, Play, RefreshCw, Trash2, X } from 'lucide-react'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { libraryById, type MediaItem } from '../data'
-import { getEpisodeCover, getMediaAffiliation, getMediaEpisode, getMediaShelf } from '../domain/media'
+import { getEpisodeCover, getMediaAffiliation, getMediaEpisode, getMediaEpisodeName, getMediaShelf } from '../domain/media'
 import { TagEditor } from './TagEditor'
 
 type VideoPlaybackAvailability = 'checking' | 'supported' | 'unsupported'
@@ -19,6 +19,8 @@ export function DetailPanel({
   onUpdateBookMetadata,
   onUpdateVideoEpisode,
   onUpdateVideoReleaseDate,
+  onApplyBangumiEpisode,
+  onOpenExternalUrl,
   onTrash,
   onReplaceVideo,
   onClose,
@@ -33,6 +35,8 @@ export function DetailPanel({
   onUpdateBookMetadata: (item: MediaItem, metadata: { creator: string; releaseDate: string }) => Promise<void>
   onUpdateVideoEpisode: (item: MediaItem, episode: string) => Promise<MediaItem | undefined>
   onUpdateVideoReleaseDate: (item: MediaItem, releaseDate: string) => Promise<MediaItem | undefined>
+  onApplyBangumiEpisode: (item: MediaItem, episodeId: string) => Promise<MediaItem | undefined>
+  onOpenExternalUrl: (url: string) => void
   onTrash?: (item: MediaItem) => Promise<void>
   onReplaceVideo?: (item: MediaItem) => void
   onClose: () => void
@@ -43,13 +47,16 @@ export function DetailPanel({
   const library = libraryById[item.library]
   const isBook = item.kind === 'book'
   const usesPerVideoMetadata = item.library === 'creator' || item.library === 'general'
-  const itemEpisode = getMediaEpisode(item)
+  const itemEpisode = getMediaEpisodeName(item)
   const [videoPlaybackAvailability, setVideoPlaybackAvailability] = useState<VideoPlaybackAvailability>('checking')
   const [editing, setEditing] = useState(false)
   const [creator, setCreator] = useState(item.creator ?? '')
   const [releaseDate, setReleaseDate] = useState(item.releaseDate ?? '')
   const [episode, setEpisode] = useState(itemEpisode)
   const [editingEpisode, setEditingEpisode] = useState(false)
+  const [bangumiEpisodeId, setBangumiEpisodeId] = useState(item.bangumiEpisodeId ?? '')
+  const [episodeScraping, setEpisodeScraping] = useState(false)
+  const [episodeRenaming, setEpisodeRenaming] = useState(false)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
@@ -57,8 +64,11 @@ export function DetailPanel({
     setReleaseDate(item.releaseDate ?? '')
     setEpisode(itemEpisode)
     setEditingEpisode(false)
+    setBangumiEpisodeId(item.bangumiEpisodeId ?? '')
+    setEpisodeScraping(false)
+    setEpisodeRenaming(false)
     setEditing(false)
-  }, [item.id, item.creator, item.releaseDate, itemEpisode, item.title])
+  }, [item.id, item.bangumiEpisodeId, item.creator, item.releaseDate, itemEpisode, item.title])
 
   useEffect(() => {
     if (isBook || !window.starMedia?.getVideoPlaybackSupport) {
@@ -100,15 +110,38 @@ export function DetailPanel({
     setSaving(true)
     try {
       let current = item
-      if (nextEpisode !== getMediaEpisode(item)) current = (await onUpdateVideoEpisode(current, nextEpisode)) ?? current
+      if (nextEpisode !== getMediaEpisodeName(item)) current = (await onUpdateVideoEpisode(current, nextEpisode)) ?? current
       if (nextReleaseDate !== (item.releaseDate ?? '')) current = (await onUpdateVideoReleaseDate(current, nextReleaseDate)) ?? current
-      setEpisode(getMediaEpisode(current))
+      setEpisode(getMediaEpisodeName(current))
       setReleaseDate(current.releaseDate ?? '')
       setEditingEpisode(false)
     } catch {
       // The parent reports the failure and the editor remains open for retrying.
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function scrapeBangumiEpisode() {
+    const episodeId = bangumiEpisodeId.trim()
+    if (!episodeId) return
+    setEpisodeScraping(true)
+    try {
+      await onApplyBangumiEpisode(item, episodeId)
+    } finally {
+      setEpisodeScraping(false)
+    }
+  }
+
+  async function renameToBangumiTitle() {
+    const episodeTitle = item.episodeTitle?.trim()
+    if (!episodeTitle || episodeTitle === getMediaEpisodeName(item)) return
+    setEpisodeRenaming(true)
+    try {
+      const current = await onUpdateVideoEpisode(item, episodeTitle)
+      if (current) setEpisode(getMediaEpisodeName(current))
+    } finally {
+      setEpisodeRenaming(false)
     }
   }
 
@@ -131,7 +164,7 @@ export function DetailPanel({
             {library.label}
           </span>
           <h2>{isBook ? item.title : getMediaEpisode(item)}</h2>
-          <p className="detail-note">{item.note}</p>
+          {(isBook ? item.note : item.episodeNote) && <p className="detail-note">{isBook ? item.note : item.episodeNote}</p>}
           <div className="detail-actions">
             {isBook && (
               <button className="primary-button" onClick={() => onRead(item)}>
@@ -196,12 +229,55 @@ export function DetailPanel({
                 className="secondary-button small-button"
                 type="submit"
                 disabled={
-                  saving || !episode.trim() || (episode.trim() === getMediaEpisode(item) && releaseDate.trim() === (item.releaseDate ?? ''))
+                  saving ||
+                  !episode.trim() ||
+                  (episode.trim() === getMediaEpisodeName(item) && releaseDate.trim() === (item.releaseDate ?? ''))
                 }
               >
                 {saving ? '保存中…' : '保存选集资料'}
               </button>
             </form>
+          )}
+          {!isBook && (
+            <section className="detail-bangumi-episode">
+              <div>
+                <strong>Bangumi 单集</strong>
+                {item.bangumiEpisodeId && <small>已关联 ID：{item.bangumiEpisodeId}</small>}
+              </div>
+              <div className="detail-bangumi-actions">
+                <input
+                  value={bangumiEpisodeId}
+                  onChange={(event) => setBangumiEpisodeId(event.target.value.replace(/\D/g, ''))}
+                  inputMode="numeric"
+                  placeholder="输入单集 ID"
+                  aria-label="Bangumi 单集 ID"
+                />
+                <button
+                  className="secondary-button small-button"
+                  onClick={() => void scrapeBangumiEpisode()}
+                  disabled={episodeScraping || !bangumiEpisodeId.trim()}
+                >
+                  <RefreshCw size={14} />
+                  {episodeScraping ? '刮削中…' : '刮削单集资料'}
+                </button>
+                {item.bangumiEpisodeUrl && (
+                  <button className="secondary-button small-button" onClick={() => onOpenExternalUrl(item.bangumiEpisodeUrl!)}>
+                    <ExternalLink size={14} />
+                    访问原页
+                  </button>
+                )}
+              </div>
+              {item.episodeTitle?.trim() && item.episodeTitle.trim() !== getMediaEpisodeName(item) && (
+                <button
+                  className="secondary-button small-button detail-bangumi-rename-button"
+                  onClick={() => void renameToBangumiTitle()}
+                  disabled={episodeRenaming}
+                >
+                  <FilePenLine size={14} />
+                  {episodeRenaming ? '重命名中…' : '使用 Bangumi 标题重命名'}
+                </button>
+              )}
+            </section>
           )}
           {isBook && editing && (
             <div className="detail-metadata-editor">
@@ -261,7 +337,7 @@ export function DetailPanel({
             )}
             <div>
               <dt>{isBook ? '发行日期' : '单集日期'}</dt>
-              <dd>{isBook ? item.releaseDate || item.firstAiredAt || '未设置' : item.releaseDate || '未设置'}</dd>
+              <dd>{isBook ? item.releaseDate || item.firstAiredAt || '未设置' : item.episodeAiredAt || item.releaseDate || '未设置'}</dd>
             </div>
           </dl>
           {item.sidecars && item.sidecars.length > 0 && <p className="detail-sidecars">已关联 {item.sidecars.length} 个字幕文件</p>}

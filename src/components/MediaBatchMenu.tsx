@@ -1,4 +1,4 @@
-import { Trash2 } from 'lucide-react'
+import { FolderOpen, Trash2 } from 'lucide-react'
 import { useEffect, useMemo, useState } from 'react'
 import { libraries, type LibraryId, type MediaItem } from '../data'
 import { isArchiveLibrary } from '../domain/media'
@@ -8,6 +8,7 @@ export function MediaBatchMenu({
   items,
   onApplyShelf,
   onTransfer,
+  onOpenInFileManager,
   onTrash,
   onClose,
 }: {
@@ -15,12 +16,14 @@ export function MediaBatchMenu({
   items: MediaItem[]
   onApplyShelf: (shelf: string) => void
   onTransfer: (targetLibrary: LibraryId) => void
+  onOpenInFileManager: () => void
   onTrash: () => void
   onClose: () => void
 }) {
   const [shelf, setShelf] = useState('')
   const canManageShelf = items.length > 0 && items.every((item) => item.kind === 'book')
-  const canTransfer = items.length > 0 && items.every((item) => item.kind === items[0].kind)
+  const canTransfer =
+    items.length > 0 && (items[0].kind === 'book' || items.length > 1) && items.every((item) => item.kind === items[0].kind)
   const targetLibraries = useMemo(
     () =>
       canTransfer
@@ -91,8 +94,14 @@ export function MediaBatchMenu({
           </button>
         </form>
       )}
-      {targetLibraries.length === 0 && !canManageShelf && (
+      {targetLibraries.length === 0 && !canManageShelf && items.length > 1 && (
         <span className="media-batch-menu-hint">请只选择同类型，且不在同一目标媒体库中的资源。</span>
+      )}
+      {items.length > 0 && (
+        <button type="button" className="secondary-button media-open-path-button" onClick={onOpenInFileManager}>
+          <FolderOpen size={15} />
+          在文件管理器中打开
+        </button>
       )}
       {items.length > 0 && (
         <button type="button" className="danger-button media-trash-button" onClick={onTrash}>

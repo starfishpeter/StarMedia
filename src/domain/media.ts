@@ -65,8 +65,13 @@ export function getMediaAffiliation(item: MediaItem) {
   return item.affiliation?.trim() || item.grouping || '未归入合集'
 }
 
-export function getMediaEpisode(item: MediaItem) {
+export function getMediaEpisodeName(item: MediaItem) {
   return item.episode?.trim() || item.title
+}
+
+export function getMediaEpisode(item: MediaItem) {
+  const episodeTitle = item.episodeTitle?.trim()
+  return episodeTitle || getMediaEpisodeName(item)
 }
 
 export function parseChineseEpisodeNumber(value: string) {
@@ -99,7 +104,9 @@ export function parseChineseEpisodeNumber(value: string) {
 }
 
 export function getEpisodeSortNumber(item: MediaItem) {
-  const text = getMediaEpisode(item).trim()
+  const text = getMediaEpisodeName(item).trim()
+  const hashMatch = text.match(/^#\s*0*(\d{1,3})$/)
+  if (hashMatch) return Number(hashMatch[1])
   const arabicMatch = text.match(/(?:第\s*)?(\d{1,3})\s*(?:话|集|話|話目|episode|ep\b)/i)
   if (arabicMatch) return Number(arabicMatch[1])
   const chineseMatch = text.match(/([零〇一二三四五六七八九十百千万两]+)\s*(?:话|集|話|話目|甘)/)
@@ -112,7 +119,7 @@ export function compareMediaEpisodes(left: MediaItem, right: MediaItem) {
   if (leftNumber !== null && rightNumber === null) return -1
   if (leftNumber === null && rightNumber !== null) return 1
   if (leftNumber !== null && rightNumber !== null && leftNumber !== rightNumber) return leftNumber - rightNumber
-  return getMediaEpisode(left).localeCompare(getMediaEpisode(right), 'zh-CN', { numeric: true })
+  return getMediaEpisodeName(left).localeCompare(getMediaEpisodeName(right), 'zh-CN', { numeric: true })
 }
 
 export function getMediaShelf(item: MediaItem) {

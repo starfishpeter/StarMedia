@@ -28,6 +28,9 @@ export interface MediaItem {
   kind: MediaKind
   cover: string
   episodeCover?: string
+  episodeTitle?: string
+  episodeNote?: string
+  episodeAiredAt?: string
   note: string
   sourcePath?: string
   relativePath?: string
@@ -45,6 +48,8 @@ export interface MediaItem {
   scraperUrl?: string
   bangumiId?: string
   bangumiUrl?: string
+  bangumiEpisodeId?: string
+  bangumiEpisodeUrl?: string
   freeAnimeHentaiId?: string
   freeAnimeHentaiUrl?: string
   hanime1Id?: string

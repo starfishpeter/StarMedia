@@ -514,6 +514,37 @@ async function createImportPlan(input) {
   return plan
 }
 
+async function discoverMatchingSidecars(item, directoryEntriesByPath) {
+  if (item?.kind !== 'video' || typeof item.sourcePath !== 'string' || !path.isAbsolute(item.sourcePath)) return item
+  const sourcePath = path.resolve(item.sourcePath)
+  const directoryPath = path.dirname(sourcePath)
+  let entryTask = directoryEntriesByPath.get(directoryPath)
+  if (!entryTask) {
+    entryTask = fs.readdir(directoryPath, { withFileTypes: true }).catch(() => [])
+    directoryEntriesByPath.set(directoryPath, entryTask)
+  }
+  const entries = await entryTask
+  const sourceBaseName = path.basename(sourcePath, path.extname(sourcePath)).toLocaleLowerCase()
+  const knownPaths = new Set(
+    (Array.isArray(item.sidecars) ? item.sidecars : [])
+      .map((sidecar) => (typeof sidecar?.sourcePath === 'string' ? path.resolve(sidecar.sourcePath).toLocaleLowerCase() : ''))
+      .filter(Boolean),
+  )
+  const discovered = []
+  for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name, 'en'))) {
+    if (!entry.isFile()) continue
+    const extension = path.extname(entry.name).toLocaleLowerCase()
+    if (!supportedSidecarExtensions.has(extension)) continue
+    if (path.basename(entry.name, extension).toLocaleLowerCase() !== sourceBaseName) continue
+    const sidecarPath = path.join(directoryPath, entry.name)
+    if (knownPaths.has(path.resolve(sidecarPath).toLocaleLowerCase())) continue
+    const stat = await fs.stat(sidecarPath).catch(() => null)
+    if (!stat?.isFile()) continue
+    discovered.push({ fileName: entry.name, sourcePath: sidecarPath, extension, size: stat.size })
+  }
+  return discovered.length > 0 ? { ...item, sidecars: [...(Array.isArray(item.sidecars) ? item.sidecars : []), ...discovered] } : item
+}
+
 async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
   const { libraryPath, backupDir, coversDir } = getConfigPaths()
   const data = await loadLibraryFile(libraryPath)
@@ -546,8 +577,11 @@ async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
   const indexedItems = data.items.filter((item) => !missingItemIds.has(item?.id))
   const generatedVideoCoverUrl = pathToFileURL(path.join(coversDir, 'videos')).toString()
   let changed = missingItemIds.size > 0
-  const items = indexedItems.map((item) => {
+  const directoryEntriesByPath = new Map()
+  const items = []
+  for (const item of indexedItems) {
     let next = item
+    if (availableLibraryRoots.get(item?.library)) next = await discoverMatchingSidecars(next, directoryEntriesByPath)
     if (item?.kind === 'book' && item.cover && !getCurrentArchiveCoverPath(item)) next = { ...next, cover: '' }
     if (
       item?.kind === 'video' &&
@@ -606,8 +640,8 @@ async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
       next = migrated
     }
     if (next !== item) changed = true
-    return next
-  })
+    items.push(next)
+  }
   let normalized = data
   if (changed)
     normalized = (
@@ -1204,12 +1238,22 @@ function registerIpc() {
 
   handle(IPC_CHANNELS.systemOpenPath, async (_event, input) => openPathInExplorer(input))
 
+  handle(IPC_CHANNELS.systemOpenExternalUrl, async (_event, input) => scraperApplicationService.openExternalUrl(input))
+
   handle(IPC_CHANNELS.bangumiSearchSubjects, async (_event, input) => scraperApplicationService.searchBangumiSubjects(input))
 
   handle(IPC_CHANNELS.bangumiPreviewSubject, async (_event, input) => scraperApplicationService.previewBangumiSubject(input))
 
   handle(IPC_CHANNELS.bangumiApplySubject, async (_event, input) =>
     withFileOperationLock(() => scraperApplicationService.applyBangumiSubject(input)),
+  )
+
+  handle(IPC_CHANNELS.bangumiAssignEpisodes, async (_event, input) =>
+    withFileOperationLock(() => scraperApplicationService.assignBangumiEpisodes(input)),
+  )
+
+  handle(IPC_CHANNELS.bangumiApplyEpisode, async (_event, input) =>
+    withFileOperationLock(() => scraperApplicationService.applyBangumiEpisode(input)),
   )
 
   handle(IPC_CHANNELS.hanimeSearchSubjects, async (_event, input) => scraperApplicationService.searchHanimeSubjects(input))

@@ -17,6 +17,8 @@ function createService({ root, library, saveLibrary, subject, fetchWithNetwork }
   return createScraperApplicationService({
     scraperAdapters: {
       getBangumiSubject: async () => ({ subject }),
+      getBangumiEpisodes: async () => [],
+      getBangumiEpisode: async () => null,
       getHanimeSubject: async () => subject,
       previewBangumiSubject: async () => ({}),
       previewHanimeSubject: async () => ({}),
@@ -74,10 +76,121 @@ test('applies Bangumi metadata and an image poster to every container item', asy
   assert.equal(result.item.affiliation, '中文标题')
   assert.equal(result.item.originalTitle, 'Original')
   assert.equal(saved.items[1].bangumiId, '42')
+  assert.equal(saved.items[0].bangumiEpisodeId, undefined)
   assert.match(saved.items[0].cover, /bangumi-42\.png/)
   assert.equal(await fs.readFile(path.join(root, 'covers', 'posters', 'bangumi-42.png'), 'utf8'), 'poster')
   assert.equal(await fs.readFile(path.join(libraryRoot, 'Original', 'one.mp4'), 'utf8'), 'one')
   assert.equal(await fs.readFile(path.join(libraryRoot, 'Original', 'two.mp4'), 'utf8'), 'two')
+})
+
+test('assigns only matching regular Bangumi episodes without changing local video names', async (t) => {
+  const root = await createSandbox(t)
+  const libraryRoot = path.join(root, 'anime')
+  const firstPath = path.join(libraryRoot, 'Series', '#01.mp4')
+  const specialPath = path.join(libraryRoot, 'Series', '#EP00.mp4')
+  await fs.mkdir(path.dirname(firstPath), { recursive: true })
+  await fs.writeFile(firstPath, 'one')
+  await fs.writeFile(specialPath, 'special')
+  const first = {
+    id: 'video:1',
+    library: 'anime',
+    kind: 'video',
+    affiliation: 'Series',
+    title: '#01',
+    episode: '#01',
+    sourcePath: firstPath,
+    sidecars: [],
+  }
+  const special = {
+    id: 'video:2',
+    library: 'anime',
+    kind: 'video',
+    affiliation: 'Series',
+    title: '#EP00',
+    episode: '#EP00',
+    sourcePath: specialPath,
+    sidecars: [],
+  }
+  let saved
+  const serviceWithEpisodes = createScraperApplicationService({
+    scraperAdapters: {
+      getBangumiSubject: async () => ({ subject: { id: 42 } }),
+      getBangumiEpisodes: async () => [
+        { id: 421, type: 0, ep: 1, url: 'https://bgm.tv/ep/421' },
+        { id: 422, type: 1, ep: 0, url: 'https://bgm.tv/ep/422' },
+      ],
+      getBangumiEpisode: async () => null,
+      getHanimeSubject: async () => null,
+      previewBangumiSubject: async () => ({}),
+      previewHanimeSubject: async () => ({}),
+      searchBangumiSubjects: async () => ({}),
+      searchHanimeSubjects: async () => ({}),
+      verifyBangumiToken: async () => ({ valid: true }),
+    },
+    getConfigPaths: () => ({ coversDir: path.join(root, 'covers') }),
+    loadConfig: async () => ({ libraries: { anime: { rootPath: libraryRoot } }, scraping: { hanime1Endpoint: 'https://hanime1.com' } }),
+    loadLibrary: async () => ({ items: [first, special], operations: [] }),
+    saveLibrary: async (data) => {
+      saved = data
+      return { data, libraryPath: 'index.json' }
+    },
+    fetchWithNetwork: async () => new Response(''),
+    writeFileAtomically,
+    appVersion: 'StarMedia/test',
+    openExternal: async () => '',
+    bangumiTokenPageUrl: 'https://next.bgm.tv/demo/access-token',
+  })
+
+  await serviceWithEpisodes.assignBangumiEpisodes({ id: first.id, subjectId: 42 })
+  assert.equal(saved.items[0].bangumiEpisodeId, '421')
+  assert.equal(saved.items[0].episode, '#01')
+  assert.equal(saved.items[1].bangumiEpisodeId, undefined)
+})
+
+test('scrapes metadata for one Bangumi episode without altering its local episode name', async (t) => {
+  const root = await createSandbox(t)
+  const item = {
+    id: 'video:1',
+    library: 'anime',
+    kind: 'video',
+    title: '#01',
+    episode: '#01',
+    sourcePath: path.join(root, 'anime', 'Series', '#01.mp4'),
+  }
+  let saved
+  const service = createScraperApplicationService({
+    scraperAdapters: {
+      getBangumiSubject: async () => ({ subject: {} }),
+      getBangumiEpisodes: async () => [],
+      getBangumiEpisode: async () => ({ id: 71, url: 'https://bgm.tv/ep/71', name: '原名', airdate: '2026-01-02', summary: '单集简介' }),
+      getHanimeSubject: async () => null,
+      previewBangumiSubject: async () => ({}),
+      previewHanimeSubject: async () => ({}),
+      searchBangumiSubjects: async () => ({}),
+      searchHanimeSubjects: async () => ({}),
+      verifyBangumiToken: async () => ({ valid: true }),
+    },
+    getConfigPaths: () => ({ coversDir: path.join(root, 'covers') }),
+    loadConfig: async () => ({
+      libraries: { anime: { rootPath: path.join(root, 'anime') } },
+      scraping: { hanime1Endpoint: 'https://hanime1.com' },
+    }),
+    loadLibrary: async () => ({ items: [item], operations: [] }),
+    saveLibrary: async (data) => {
+      saved = data
+      return { data, libraryPath: 'index.json' }
+    },
+    fetchWithNetwork: async () => new Response(''),
+    writeFileAtomically,
+    appVersion: 'StarMedia/test',
+    openExternal: async () => '',
+    bangumiTokenPageUrl: 'https://next.bgm.tv/demo/access-token',
+  })
+
+  await service.applyBangumiEpisode({ id: item.id, episodeId: 71 })
+  assert.equal(saved.items[0].episode, '#01')
+  assert.equal(saved.items[0].episodeTitle, '原名')
+  assert.equal(saved.items[0].episodeNote, '单集简介')
 })
 
 test('restores the renamed scraper container when saving metadata fails', async (t) => {
@@ -188,6 +301,8 @@ test('opens the Bangumi token page and surfaces shell errors', async (t) => {
   const service = createScraperApplicationService({
     scraperAdapters: {
       getBangumiSubject: async () => ({ subject: {} }),
+      getBangumiEpisodes: async () => [],
+      getBangumiEpisode: async () => null,
       getHanimeSubject: async () => ({}),
       previewBangumiSubject: async () => ({}),
       previewHanimeSubject: async () => ({}),

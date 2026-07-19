@@ -110,6 +110,27 @@ function makeScrapePreview(source, subject, fields) {
   }
 }
 
+function toBangumiEpisode(episode) {
+  const id = Number(episode?.id)
+  const subjectId = Number(episode?.subject_id)
+  const type = Number(episode?.type)
+  const ep = Number(episode?.ep)
+  const sort = Number(episode?.sort)
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(subjectId) || subjectId <= 0) return null
+  return {
+    id,
+    subjectId,
+    type: Number.isFinite(type) ? type : 0,
+    ep: Number.isFinite(ep) ? ep : 0,
+    sort: Number.isFinite(sort) ? sort : 0,
+    name: normalizeScrapedField(episode?.name, 200),
+    nameCn: normalizeScrapedField(episode?.name_cn, 200),
+    airdate: normalizeScrapedField(episode?.airdate, 40),
+    summary: normalizeScrapedField(stripHtml(episode?.desc), 1200),
+    url: `https://bgm.tv/ep/${id}`,
+  }
+}
+
 function getTokenExpiry(token) {
   const parts = String(token ?? '')
     .trim()
@@ -328,6 +349,19 @@ function createScraperAdapters({
     return { preview: makeScrapePreview('bangumi', subject, makeBangumiScrapeFields(subject)) }
   }
 
+  async function getBangumiEpisodes(subjectId) {
+    const config = await loadConfig()
+    const result = await requestBangumi(config, `/episodes?subject_id=${subjectId}&type=0&limit=100`, {
+      headers: getBangumiHeaders(config),
+    })
+    return (Array.isArray(result?.data) ? result.data : []).map(toBangumiEpisode).filter(Boolean)
+  }
+
+  async function getBangumiEpisode(episodeId) {
+    const config = await loadConfig()
+    return toBangumiEpisode(await requestBangumi(config, `/episodes/${episodeId}`, { headers: getBangumiHeaders(config) }))
+  }
+
   async function verifyBangumiToken() {
     const config = await loadConfig()
     const token = String(config?.scraping?.bangumiToken ?? '').trim()
@@ -425,6 +459,8 @@ function createScraperAdapters({
 
   return {
     getBangumiSubject,
+    getBangumiEpisode,
+    getBangumiEpisodes,
     getHanimeSubject,
     makeBangumiScrapeFields,
     makeHanimeScrapeFields,

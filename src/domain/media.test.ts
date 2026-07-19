@@ -4,6 +4,7 @@ import {
   compareMediaItems,
   getEpisodeSortNumber,
   getMediaAffiliation,
+  getMediaEpisode,
   getMediaShelf,
   isArchiveLibrary,
   parseChineseEpisodeNumber,
@@ -46,6 +47,7 @@ describe('media domain rules', () => {
     expect(parseChineseEpisodeNumber('十万')).toBe(100000)
     expect(getEpisodeSortNumber(createItem({ episode: '第 12 话' }))).toBe(12)
     expect(getEpisodeSortNumber(createItem({ episode: '第十二话' }))).toBe(12)
+    expect(getEpisodeSortNumber(createItem({ episode: '#01' }))).toBe(1)
 
     const episodes = [
       createItem({ id: 'third', episode: '第 3 话' }),
@@ -53,6 +55,13 @@ describe('media domain rules', () => {
       createItem({ id: 'second', episode: '第 2 话' }),
     ]
     expect(episodes.sort(compareMediaEpisodes).map((item) => item.id)).toEqual(['first', 'second', 'third'])
+  })
+
+  it('prefers a scraped episode title for display while retaining the local episode name for sorting', () => {
+    const item = createItem({ episode: '#01', episodeTitle: 'Bangumi 原始标题' })
+
+    expect(getMediaEpisode(item)).toBe('Bangumi 原始标题')
+    expect(getEpisodeSortNumber(item)).toBe(1)
   })
 
   it('sorts dates with missing values last', () => {

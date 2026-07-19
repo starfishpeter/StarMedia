@@ -95,6 +95,19 @@ interface StarMediaBangumiSubject {
   summary?: string
 }
 
+interface StarMediaBangumiEpisode {
+  id: number
+  subjectId: number
+  type: number
+  ep: number
+  sort: number
+  name: string
+  nameCn: string
+  airdate: string
+  summary: string
+  url: string
+}
+
 interface StarMediaHanimeSubject {
   id: number
   name: string
@@ -328,6 +341,15 @@ interface Window {
       mode?: 'cover' | 'metadata' | 'both'
       fields?: StarMediaScrapeFields
     }) => Promise<StarMediaLibraryResult & { item?: import('./data').MediaItem; subject: Omit<StarMediaBangumiSubject, 'image'> }>
+    assignBangumiEpisodes?: (input: {
+      id: string
+      subjectId: number | string
+    }) => Promise<StarMediaLibraryResult & { assignedCount: number }>
+    applyBangumiEpisode?: (input: {
+      id: string
+      episodeId: number | string
+    }) => Promise<StarMediaLibraryResult & { item: import('./data').MediaItem; episode: StarMediaBangumiEpisode }>
+    openExternalUrl?: (url: string) => Promise<{ url: string }>
     searchHanimeSubjects?: (input: {
       query: string
       source?: 'freeanimehentai' | 'hanime1'

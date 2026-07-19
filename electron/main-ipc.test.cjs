@@ -264,6 +264,37 @@ test('preserves records when their entire configured library root is unavailable
   )
 })
 
+test('discovers matching external subtitles for existing indexed videos', async (t) => {
+  const { dataRoot, handlers, main, windows } = loadMainWithElectronMock(t)
+  main.createWindow()
+  main.registerIpc()
+  const event = { sender: windows[0].webContents, senderFrame: windows[0].webContents.mainFrame }
+  const libraryRoot = path.join(os.tmpdir(), `starmedia-main-sidecar-discovery-${Date.now()}`)
+  const collectionRoot = path.join(libraryRoot, 'Collection')
+  const sourcePath = path.join(collectionRoot, '#01.mp4')
+  const subtitlePath = path.join(collectionRoot, '#01.ass')
+  t.after(() => fsPromises.rm(libraryRoot, { recursive: true, force: true }))
+  await fsPromises.mkdir(collectionRoot, { recursive: true })
+  await fsPromises.writeFile(sourcePath, 'video')
+  await fsPromises.writeFile(subtitlePath, 'subtitle')
+  const config = await main.loadConfig()
+  config.libraries.erAnime.rootPath = libraryRoot
+  await handlers.get(IPC_CHANNELS.configSave)(event, config)
+  await fsPromises.writeFile(
+    path.join(dataRoot, 'starmedia-library.json'),
+    `${JSON.stringify({
+      items: [{ id: 'video:legacy', library: 'erAnime', kind: 'video', title: '#01', affiliation: 'Collection', sourcePath, sidecars: [] }],
+      operations: [],
+    })}\n`,
+  )
+
+  const loaded = await handlers.get(IPC_CHANNELS.libraryLoad)(event)
+  assert.deepEqual(loaded.data.items[0].sidecars, [{ fileName: '#01.ass', sourcePath: subtitlePath, extension: '.ass', size: 8 }])
+  assert.deepEqual(JSON.parse(await fsPromises.readFile(path.join(dataRoot, 'starmedia-library.json'), 'utf8')).items[0].sidecars, [
+    { fileName: '#01.ass', sourcePath: subtitlePath, extension: '.ass', size: 8 },
+  ])
+})
+
 test('creates import plans through trusted IPC without treating missing sources as ready items', async (t) => {
   const { dataRoot, handlers, main, windows } = loadMainWithElectronMock(t)
   main.createWindow()

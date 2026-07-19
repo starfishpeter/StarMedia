@@ -3,7 +3,7 @@ const path = require('node:path')
 const { pathToFileURL } = require('node:url')
 const { isPosterLibrary } = require('./library-definitions.cjs')
 const { normalizeFolderName } = require('./file-operations.cjs')
-const { getItemAffiliation } = require('./import-service.cjs')
+const { getItemAffiliation, getItemEpisode } = require('./import-service.cjs')
 const { getVideoStorageFolderName, renameVideoContainerDirectory } = require('./library-file-layout-service.cjs')
 const {
   getBangumiImageUrl,
@@ -36,6 +36,12 @@ function normalizeScrapedFolderName(value, fallback, label = '刮削名称') {
   } catch {
     return fallback
   }
+}
+
+function getEpisodeNumber(item) {
+  const value = getItemEpisode(item)
+  const match = value.match(/(?:^|[^a-z0-9])(?:ep(?:isode)?\s*)?0*(\d{1,3})(?:$|[^a-z0-9])/i)
+  return match ? Number(match[1]) : null
 }
 
 function imageExtensionFromResponse(response, imageUrl) {
@@ -197,6 +203,30 @@ function createScraperApplicationService({
     }
   }
 
+  async function assignBangumiEpisodes(input) {
+    const id = String(input?.id ?? '')
+    const subjectId = Number(input?.subjectId)
+    if (!id || !Number.isInteger(subjectId) || subjectId <= 0) throw new Error('Bangumi 条目无效')
+    const [episodes, library] = await Promise.all([scraperAdapters.getBangumiEpisodes(subjectId), loadLibrary()])
+    const selected = library.items.find((item) => item?.id === id)
+    if (!selected || selected.kind !== 'video' || !isPosterLibrary(selected.library)) throw new Error('只能为番剧或里番合集分配章节')
+    const affiliation = getItemAffiliation(selected)
+    const episodesByNumber = new Map(
+      episodes.filter((episode) => episode.type === 0 && episode.ep > 0).map((episode) => [episode.ep, episode]),
+    )
+    let assignedCount = 0
+    const items = library.items.map((item) => {
+      if (item?.kind !== 'video' || item.library !== selected.library || getItemAffiliation(item) !== affiliation) return item
+      const matchedEpisode = episodesByNumber.get(getEpisodeNumber(item))
+      if (!matchedEpisode) return item
+      if (item.bangumiEpisodeId === String(matchedEpisode.id) && item.bangumiEpisodeUrl === matchedEpisode.url) return item
+      assignedCount += 1
+      return { ...item, bangumiEpisodeId: String(matchedEpisode.id), bangumiEpisodeUrl: matchedEpisode.url }
+    })
+    const saved = await saveLibrary({ items, operations: library.operations }, { backupExisting: false })
+    return { ...saved, assignedCount }
+  }
+
   async function applyHanimeSubject(input) {
     const id = String(input?.id ?? '')
     const subjectId = Number(input?.subjectId)
@@ -271,6 +301,40 @@ function createScraperApplicationService({
     }
   }
 
+  async function applyBangumiEpisode(input) {
+    const id = String(input?.id ?? '')
+    const episodeId = Number(input?.episodeId)
+    if (!id || !Number.isInteger(episodeId) || episodeId <= 0) throw new Error('Bangumi 单集无效')
+    const [episode, library] = await Promise.all([scraperAdapters.getBangumiEpisode(episodeId), loadLibrary()])
+    const index = library.items.findIndex((item) => item?.id === id && item.kind === 'video')
+    if (!episode || index < 0) throw new Error('Bangumi 单集不存在，或视频记录已移除')
+    const items = [...library.items]
+    items[index] = {
+      ...items[index],
+      bangumiEpisodeId: String(episode.id),
+      bangumiEpisodeUrl: episode.url,
+      episodeTitle: episode.name,
+      episodeAiredAt: episode.airdate,
+      episodeNote: episode.summary,
+    }
+    const saved = await saveLibrary({ items, operations: library.operations }, { backupExisting: false })
+    return { ...saved, item: saved.data.items[index], episode }
+  }
+
+  async function openExternalUrl(input) {
+    const url = String(input?.url ?? '').trim()
+    let parsed
+    try {
+      parsed = new URL(url)
+    } catch {
+      throw new Error('来源网页地址无效')
+    }
+    if (!['https:', 'http:'].includes(parsed.protocol)) throw new Error('来源网页地址无效')
+    const error = await openExternal(parsed.toString())
+    if (error) throw new Error(error)
+    return { url: parsed.toString() }
+  }
+
   async function openBangumiTokenPage() {
     const error = await openExternal(bangumiTokenPageUrl)
     if (error) throw new Error(error)
@@ -279,8 +343,11 @@ function createScraperApplicationService({
 
   return {
     applyBangumiSubject,
+    assignBangumiEpisodes,
+    applyBangumiEpisode,
     applyHanimeSubject,
     openBangumiTokenPage,
+    openExternalUrl,
     previewBangumiSubject: (input) => scraperAdapters.previewBangumiSubject(input),
     previewHanimeSubject: (input) => scraperAdapters.previewHanimeSubject(input),
     searchBangumiSubjects: (input) => scraperAdapters.searchBangumiSubjects(input),

@@ -78,6 +78,10 @@ test('IPC request contracts reject malformed, oversized, and ambiguous input', (
   assert.throws(() => parseIpcRequest(IPC_CHANNELS.videoGetPlayback, ['x'.repeat(4097)]), /媒体 ID 过长/)
   assert.throws(() => parseIpcRequest(IPC_CHANNELS.bookGetPage, ['not-a-session', 0]), /阅读会话 ID 无效/)
   assert.throws(
+    () => parseIpcRequest(IPC_CHANNELS.bangumiAssignEpisodes, [{ id: 'video:1', subjectId: 0 }]),
+    /Bangumi ID必须是有效的正整数/,
+  )
+  assert.throws(
     () =>
       parseIpcRequest(IPC_CHANNELS.configSave, [
         {

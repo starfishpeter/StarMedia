@@ -40,6 +40,7 @@ export function LibraryBrowser({
   onOpenBatchMenu,
   onOpenBatchMenuForItems,
   onSelectMany,
+  allowSelectAll = false,
   affiliationOverview,
   shelfOverview,
   libraryUsageBytes,
@@ -68,6 +69,7 @@ export function LibraryBrowser({
   onOpenBatchMenu: (item: MediaItem, event: React.MouseEvent<HTMLElement>) => void
   onOpenBatchMenuForItems: (items: MediaItem[], event: React.MouseEvent<HTMLElement>) => void
   onSelectMany: (items: MediaItem[]) => void
+  allowSelectAll?: boolean
   affiliationOverview: ReactNode
   shelfOverview: ReactNode
   libraryUsageBytes: number | null
@@ -86,6 +88,19 @@ export function LibraryBrowser({
         ]
   const total =
     isAffiliationLibrary && !queryActive && !selectedAffiliation ? new Set(visibleItems.map(getMediaAffiliation)).size : visibleItems.length
+
+  useEffect(() => {
+    if (!allowSelectAll || !isAffiliationLibrary || queryActive || showingContainer) return
+    const selectAllCollections = (event: KeyboardEvent) => {
+      if ((!event.ctrlKey && !event.metaKey) || event.key.toLocaleLowerCase() !== 'a') return
+      const target = event.target instanceof HTMLElement ? event.target : null
+      if (target?.closest('input, select, textarea, [contenteditable="true"]')) return
+      event.preventDefault()
+      onSelectMany(visibleItems)
+    }
+    window.addEventListener('keydown', selectAllCollections)
+    return () => window.removeEventListener('keydown', selectAllCollections)
+  }, [allowSelectAll, isAffiliationLibrary, onSelectMany, queryActive, showingContainer, visibleItems])
 
   return (
     <section
@@ -120,13 +135,15 @@ export function LibraryBrowser({
               options={sortDirectionOptions}
             />
             {supportsExternalSubtitleBadges && (
-              <label className="toggle-pill toolbar-toggle">
+              <label className="toolbar-toggle" aria-label="显示额外信息角标">
+                <span className="toolbar-toggle-label">额外信息</span>
+                <span className="toolbar-toggle-state">{showExternalSubtitleBadges ? '开' : '关'}</span>
                 <input
                   type="checkbox"
                   checked={showExternalSubtitleBadges}
                   onChange={(event) => onShowExternalSubtitleBadgesChange(event.target.checked)}
                 />
-                外挂字幕
+                <span className="toolbar-switch" aria-hidden="true" />
               </label>
             )}
           </div>
@@ -304,7 +321,9 @@ export function AffiliationWall({
               style={{ background: coverItem.cover } as CSSProperties}
             >
               <span className="cover-grain" />
-              {showExternalSubtitleBadges && episodes.some(hasExternalSubtitle) && <span className="external-subtitle-badge">外挂</span>}
+              {showExternalSubtitleBadges && episodes.some(hasExternalSubtitle) && (
+                <span className="external-subtitle-badge">外挂字幕</span>
+              )}
             </div>
             <span className="affiliation-card-info">
               <strong>{affiliation}</strong>

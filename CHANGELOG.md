@@ -2,6 +2,53 @@
 
 本项目从公开版本开始采用接近 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 的格式，版本号遵循语义化版本。
 
+## [0.7.6] - 2026-07-19
+
+### 改进
+
+- Bangumi 单集资料优先作为选集显示标题；本地集号继续仅用于稳定排序与文件定位。
+- 单集详情新增“使用 Bangumi 标题重命名”，会将视频与已关联外挂字幕成组重命名，并沿用冲突预检和失败回滚。
+- Bangumi 合集 ID 区新增显式“分配章节”操作，仅在点击后关联可确认的正篇章节；合集资料写入不再隐式分配。
+- 刮削面板恢复全宽布局，Bangumi 搜索和 ID 两行操作按钮统一高度。
+
+## [0.7.5] - 2026-07-19
+
+### 改进
+
+- Bangumi 合集刮削会自动关联集号可确认的正篇单集 ID；SP、PV、预告和其他非正篇条目不会自动关联。
+- 视频详情新增独立的 Bangumi 单集区块，可输入或粘贴单集 ID 后刮削当前选集的显示标题、首播日期和单集简介；本地文件名与合集简介不受影响。
+- Bangumi 合集 ID 旁新增“访问原页”操作；刮削面板收紧至易读宽度，并将制作公司与第一话首播日期并列编辑。
+- 缩小顶部栏下方的首段留白，减少媒体墙与标题栏之间的空白。
+
+## [0.7.4] - 2026-07-19
+
+### 改进
+
+- 合集简介默认最多显示六行，可按需展开或收起，长简介不再将选集区域推离首屏。
+- 标签输入框改为应用内联想建议：输入关键词后显示最多八个匹配标签，仍支持直接输入新标签并按 Enter 添加。
+- 统一主界面、漫画阅读器和应用内播放器的顶部栏高度；外挂字幕角标进一步贴近封面右下角。
+
+## [0.7.3] - 2026-07-19
+
+### 改进
+
+- 外挂字幕角标开关更名为“额外信息”，合集封面角标改为蓝色“外挂字幕”；右键菜单新增在 Windows 文件管理器中打开所在目录。
+- 媒体库合集墙支持 Ctrl+A 选中当前库的全部合集；单个视频的右键菜单不再显示跨媒体库转移。
+
+### 修复
+
+- 加载媒体库时自动补齐旧索引中遗漏的同目录同名外置字幕记录，已有的 ASS/SSA 等字幕合集可正确显示角标。
+
+## [0.7.2] - 2026-07-19
+
+### 改进
+
+- 外挂字幕改为带“开/关”状态文字的滑动开关，并强化合集封面的“外挂”高对比度角标。
+
+### 修复
+
+- 从合集或书架返回媒体库列表时恢复进入前的滚动位置，不再因详情内容较短而回到顶部。
+
 ## [0.7.1] - 2026-07-19
 
 ### 改进
@@ -163,3 +210,8 @@
 [0.6.30]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.30
 [0.6.35]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.6.35
 [0.7.1]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.1
+[0.7.2]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.2
+[0.7.3]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.3
+[0.7.4]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.4
+[0.7.5]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.5
+[0.7.6]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.6

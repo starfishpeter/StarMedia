@@ -439,6 +439,11 @@ const IPC_CONTRACTS = Object.freeze({
     response: '{ path: string }',
     parse: (args) => oneArgument(args, (value) => absolutePath(value, '目标路径')),
   },
+  'system:openExternalUrl': {
+    request: ['url'],
+    response: '{ url: string }',
+    parse: (args) => oneArgument(args, (value) => ({ url: string(value, '来源网页地址', { min: 1, max: 2000, trim: true }) })),
+  },
   'bangumi:searchSubjects': {
     request: ['StarMediaSearchRequest'],
     response: '{ subjects: StarMediaBangumiSubject[] }',
@@ -457,6 +462,24 @@ const IPC_CONTRACTS = Object.freeze({
     request: ['StarMediaScrapeApplyRequest'],
     response: 'StarMediaLibraryResult & { item?: MediaItem; subject: StarMediaBangumiSubject }',
     parse: (args) => oneArgument(args, (value) => parseScrapeRequest(value, { includeItemId: true })),
+  },
+  'bangumi:assignEpisodes': {
+    request: ['StarMediaBangumiEpisodeAssignmentRequest'],
+    response: 'StarMediaLibraryResult & { assignedCount: number }',
+    parse: (args) =>
+      oneArgument(args, (value) => {
+        const input = object(value, 'Bangumi 章节分配请求', ['id', 'subjectId'])
+        return { id: id(input.id, '媒体 ID'), subjectId: positiveInteger(Number(input.subjectId), 'Bangumi ID', 2_147_483_647) }
+      }),
+  },
+  'bangumi:applyEpisode': {
+    request: ['StarMediaBangumiEpisodeApplyRequest'],
+    response: 'StarMediaLibraryResult & { item: MediaItem; episode: StarMediaBangumiEpisode }',
+    parse: (args) =>
+      oneArgument(args, (value) => {
+        const input = object(value, 'Bangumi 单集请求', ['id', 'episodeId'])
+        return { id: id(input.id, '媒体 ID'), episodeId: positiveInteger(Number(input.episodeId), '单集 ID', 2_147_483_647) }
+      }),
   },
   'bangumi:openTokenPage': { request: [], response: '{ url: string }', parse: noArguments },
   'bangumi:verifyToken': { request: [], response: '{ valid: boolean; expiresAt: string | null; userName: string }', parse: noArguments },

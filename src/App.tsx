@@ -126,6 +126,16 @@ function App() {
   const readerRequestRef = useRef(0)
   const readerSessionIdRef = useRef('')
   const playerRequestRef = useRef(0)
+  const mainContentRef = useRef<HTMLElement | null>(null)
+  const libraryScrollPositionsRef = useRef<Record<LibraryId, number>>({
+    erAnime: 0,
+    anime: 0,
+    creator: 0,
+    books: 0,
+    comics: 0,
+    general: 0,
+  })
+  const pendingLibraryScrollRestoreRef = useRef<number | null>(null)
 
   const activeLibrary = isLibraryNavigation(activeNavigation) ? libraryById[activeNavigation] : null
   const activeLibraryRoot = activeLibrary ? config.libraries[activeLibrary.id].rootPath : ''
@@ -276,6 +286,16 @@ function App() {
   }, [config])
 
   useEffect(() => {
+    if (selectedAffiliation || selectedShelf || pendingLibraryScrollRestoreRef.current === null) return
+    const scrollTop = pendingLibraryScrollRestoreRef.current
+    const frame = window.requestAnimationFrame(() => {
+      mainContentRef.current?.scrollTo({ top: scrollTop })
+      pendingLibraryScrollRestoreRef.current = null
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [selectedAffiliation, selectedShelf])
+
+  useEffect(() => {
     let cancelled = false
 
     async function loadLibrary() {
@@ -297,7 +317,8 @@ function App() {
   }, [])
 
   function selectNavigation(id: SectionId) {
-    document.querySelector<HTMLElement>('.main-content')?.scrollTo({ top: 0 })
+    mainContentRef.current?.scrollTo({ top: 0 })
+    pendingLibraryScrollRestoreRef.current = null
     setActiveNavigation(id)
     setSelectedAffiliation(null)
     setSelectedShelf(null)
@@ -835,7 +856,7 @@ function App() {
     )
     setMediaBatchMenu({
       x: Math.min(event.clientX, Math.max(12, window.innerWidth - 306)),
-      y: Math.min(event.clientY, Math.max(12, window.innerHeight - 342)),
+      y: Math.min(event.clientY, Math.max(12, window.innerHeight - 402)),
     })
   }
 
@@ -878,6 +899,19 @@ function App() {
     } catch (error) {
       console.error(error)
       notify(error instanceof Error ? `转移失败：${error.message}` : '转移失败。')
+    }
+  }
+
+  async function openSelectedMediaInFileManager() {
+    const item = libraryItems.find((candidate) => selectedMediaIds.includes(candidate.id) && candidate.sourcePath)
+    if (!item?.sourcePath || !window.starMedia?.openPath) return
+    try {
+      const result = await window.starMedia.openPath(item.sourcePath)
+      setMediaBatchMenu(null)
+      notify(`已在文件管理器中打开「${result.path}」。`)
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `打开文件管理器失败：${error.message}` : '打开文件管理器失败。')
     }
   }
 
@@ -1239,6 +1273,32 @@ function App() {
     }
   }
 
+  async function applyBangumiEpisode(item: MediaItem, episodeId: string) {
+    if (!window.starMedia?.applyBangumiEpisode) throw new Error('当前运行环境无法访问 Bangumi 单集资料。')
+    try {
+      const result = await window.starMedia.applyBangumiEpisode({ id: item.id, episodeId })
+      setLibraryItems(result.data.items)
+      setSelectedItem((current) => (current?.id === item.id ? result.item : current))
+      setPlayerItem((current) => (current?.id === item.id ? result.item : current))
+      notify('已更新当前选集的 Bangumi 资料。')
+      return result.item
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `刮削单集资料失败：${error.message}` : '刮削单集资料失败。')
+      throw error
+    }
+  }
+
+  async function openExternalUrl(url: string) {
+    if (!window.starMedia?.openExternalUrl) return
+    try {
+      await window.starMedia.openExternalUrl(url)
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `打开来源网页失败：${error.message}` : '打开来源网页失败。')
+    }
+  }
+
   async function searchBangumiSubjects(query: string) {
     if (!window.starMedia?.searchBangumiSubjects) throw new Error('当前运行环境无法访问 Bangumi。')
     const result = await window.starMedia.searchBangumiSubjects({ query })
@@ -1268,6 +1328,18 @@ function App() {
     }
     notify('已按选择的字段应用 Bangumi 资料。')
     return result.subject
+  }
+
+  async function assignBangumiEpisodes(item: MediaItem, subjectId: number) {
+    if (!window.starMedia?.assignBangumiEpisodes) throw new Error('当前运行环境无法分配 Bangumi 章节。')
+    const result = await window.starMedia.assignBangumiEpisodes({ id: item.id, subjectId })
+    setLibraryItems(result.data.items)
+    const currentItem = result.data.items.find((candidate) => candidate.id === item.id)
+    if (currentItem) {
+      setSelectedItem((current) => (current?.id === item.id ? currentItem : current))
+      setPlayerItem((current) => (current?.id === item.id ? currentItem : current))
+    }
+    return result.assignedCount
   }
 
   async function searchHanimeSubjects(query: string, source: 'freeanimehentai' | 'hanime1') {
@@ -1379,7 +1451,7 @@ function App() {
         </div>
       </aside>
 
-      <main className="main-content">
+      <main className="main-content" ref={mainContentRef}>
         {!readerItem && !playerItem && (
           <header className={`topbar ${activeLibrary ? 'media-topbar' : 'window-topbar'}`}>
             {activeLibrary ? (
@@ -1493,10 +1565,12 @@ function App() {
               setMediaBatchMenu(null)
             }}
             onOpenAffiliation={(affiliation) => {
+              if (activeLibrary) libraryScrollPositionsRef.current[activeLibrary.id] = mainContentRef.current?.scrollTop ?? 0
               setSelectedAffiliation(affiliation)
               setSelectedMediaIds([])
             }}
             onOpenShelf={(shelf) => {
+              if (activeLibrary) libraryScrollPositionsRef.current[activeLibrary.id] = mainContentRef.current?.scrollTop ?? 0
               setSelectedShelf(shelf)
               setSelectedMediaIds([])
             }}
@@ -1505,6 +1579,7 @@ function App() {
             onOpenBatchMenu={openMediaBatchMenu}
             onOpenBatchMenuForItems={openMediaBatchMenuForItems}
             onSelectMany={selectMediaItems}
+            allowSelectAll={!selectedItem && !readerItem && !playerItem && !mediaBatchMenu}
             libraryUsageBytes={libraryUsageBytes}
             affiliationOverview={
               selectedAffiliation && (
@@ -1516,6 +1591,7 @@ function App() {
                   onContainerImport={() => void importIntoContainer(activeLibrary?.id ?? 'general', selectedAffiliation)}
                   importing={directImporting}
                   onBack={() => {
+                    if (activeLibrary) pendingLibraryScrollRestoreRef.current = libraryScrollPositionsRef.current[activeLibrary.id]
                     setSelectedAffiliation(null)
                     setSelectedMediaIds([])
                   }}
@@ -1527,6 +1603,8 @@ function App() {
                   onSearchBangumi={searchBangumiSubjects}
                   onPreviewBangumi={previewBangumiSubject}
                   onApplyBangumi={applyBangumiSubject}
+                  onAssignBangumiEpisodes={assignBangumiEpisodes}
+                  onOpenExternalUrl={(url) => void openExternalUrl(url)}
                   onSearchHanime={searchHanimeSubjects}
                   onPreviewHanime={previewHanimeSubject}
                   onApplyHanime={applyHanimeSubject}
@@ -1547,6 +1625,7 @@ function App() {
                   onContainerImport={() => void importIntoContainer(activeLibrary?.id ?? 'books', selectedShelf)}
                   importing={directImporting}
                   onBack={() => {
+                    if (activeLibrary) pendingLibraryScrollRestoreRef.current = libraryScrollPositionsRef.current[activeLibrary.id]
                     setSelectedShelf(null)
                     setSelectedMediaIds([])
                   }}
@@ -1577,6 +1656,8 @@ function App() {
           onUpdateBookMetadata={updateBookMetadata}
           onUpdateVideoEpisode={updateVideoEpisode}
           onUpdateVideoReleaseDate={updateVideoReleaseDate}
+          onApplyBangumiEpisode={applyBangumiEpisode}
+          onOpenExternalUrl={(url) => void openExternalUrl(url)}
           onTrash={trashSingleMedia}
           onReplaceVideo={(item) => void importIntoContainer(item.library, getMediaAffiliation(item), item.id)}
           onClose={() => setSelectedItem(null)}
@@ -1615,6 +1696,7 @@ function App() {
           items={libraryItems.filter((item) => selectedMediaIds.includes(item.id))}
           onApplyShelf={updateBookShelves}
           onTransfer={transferSelectedMedia}
+          onOpenInFileManager={() => void openSelectedMediaInFileManager()}
           onTrash={trashSelectedMedia}
           onClose={() => setMediaBatchMenu(null)}
         />
