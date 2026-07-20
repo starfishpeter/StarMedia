@@ -15,6 +15,8 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       theme: 'dark',
       cacheLimitMb: 4096,
       confirmBeforeClose: true,
+      defaultPlaybackMode: 'contain',
+      defaultReadingMode: 'page',
       showExternalSubtitleBadges: false,
       network: {
         proxyEnabled: false,
@@ -97,6 +99,10 @@ function createConfigService({ getConfigPaths, defaultHanime1Endpoint, now = () 
       theme: ['dark', 'light', 'blue'].includes(config.theme) ? config.theme : 'dark',
       cacheLimitMb: normalizeCacheLimitMb(config.cacheLimitMb, defaults.cacheLimitMb),
       confirmBeforeClose: typeof config.confirmBeforeClose === 'boolean' ? config.confirmBeforeClose : defaults.confirmBeforeClose,
+      defaultPlaybackMode: ['contain', 'theater'].includes(config.defaultPlaybackMode)
+        ? config.defaultPlaybackMode
+        : defaults.defaultPlaybackMode,
+      defaultReadingMode: ['page', 'scroll'].includes(config.defaultReadingMode) ? config.defaultReadingMode : defaults.defaultReadingMode,
       showExternalSubtitleBadges:
         typeof config.showExternalSubtitleBadges === 'boolean' ? config.showExternalSubtitleBadges : defaults.showExternalSubtitleBadges,
       network: { proxyEnabled, proxyUrl },

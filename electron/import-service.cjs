@@ -44,7 +44,7 @@ function sourceKey(filePath) {
 }
 
 function getItemAffiliation(item) {
-  return typeof item?.affiliation === 'string' && item.affiliation.trim() ? item.affiliation.trim() : item?.grouping || '未归入合集'
+  return typeof item?.affiliation === 'string' && item.affiliation.trim() ? item.affiliation.trim() : '未归入合集'
 }
 
 function getItemEpisode(item) {
@@ -341,7 +341,11 @@ async function executeMediaImport({ libraryId, items, config, library, saveLibra
             bangumiUrl: replacementItem.bangumiUrl,
             bangumiEpisodeId: replacementItem.bangumiEpisodeId,
             bangumiEpisodeUrl: replacementItem.bangumiEpisodeUrl,
+            bangumiEpisodeSort: replacementItem.bangumiEpisodeSort,
+            bangumiEpisodeType: replacementItem.bangumiEpisodeType,
+            bangumiEpisodeLabel: replacementItem.bangumiEpisodeLabel,
             episodeTitle: replacementItem.episodeTitle,
+            episodeTitleSource: replacementItem.episodeTitleSource,
             episodeNote: replacementItem.episodeNote,
             episodeAiredAt: replacementItem.episodeAiredAt,
             freeAnimeHentaiId: replacementItem.freeAnimeHentaiId,

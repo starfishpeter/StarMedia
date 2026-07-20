@@ -351,7 +351,7 @@ function createScraperAdapters({
 
   async function getBangumiEpisodes(subjectId) {
     const config = await loadConfig()
-    const result = await requestBangumi(config, `/episodes?subject_id=${subjectId}&type=0&limit=100`, {
+    const result = await requestBangumi(config, `/episodes?subject_id=${subjectId}&limit=100`, {
       headers: getBangumiHeaders(config),
     })
     return (Array.isArray(result?.data) ? result.data : []).map(toBangumiEpisode).filter(Boolean)

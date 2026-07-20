@@ -4,7 +4,7 @@ const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
 const { run7z, replaceFileAtomically } = require('./archive-tooling.cjs')
-const { archiveKey, createArchiveReaderCacheService, parse7zTechnicalList } = require('./archive-reader-cache-service.cjs')
+const { createArchiveReaderCacheService, parse7zTechnicalList } = require('./archive-reader-cache-service.cjs')
 
 async function createSandbox(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'starmedia-archive-reader-test-'))
@@ -24,30 +24,6 @@ function createReader(root, dependencies = {}) {
     ...dependencies,
   })
 }
-
-test('migrates an existing full-size cover without reopening the archive', async (t) => {
-  const root = await createSandbox(t)
-  const archivePath = path.join(root, 'book.zip')
-  await fs.writeFile(archivePath, 'archive bytes are not read during cover migration')
-  const key = archiveKey(archivePath, await fs.stat(archivePath))
-  const coverDir = path.join(root, 'covers', 'books')
-  const legacyCover = path.join(coverDir, `${key}.png`)
-  await fs.mkdir(coverDir, { recursive: true })
-  await fs.writeFile(legacyCover, 'legacy full-size cover')
-  const migrated = []
-  const reader = createReader(root, {
-    createCoverThumbnail: async (sourcePath, outputPath) => {
-      migrated.push(sourcePath)
-      await fs.copyFile(sourcePath, outputPath)
-    },
-  })
-
-  const cover = await reader.createCover(archivePath)
-
-  assert.deepEqual(migrated, [legacyCover])
-  assert.match(cover, /-thumb-v2\.jpg/)
-  assert.equal(await fs.readFile(path.join(coverDir, `${key}-thumb-v2.jpg`), 'utf8'), 'legacy full-size cover')
-})
 
 test('opens ZIP pages in natural order and reuses cached extraction', async (t) => {
   const root = await createSandbox(t)

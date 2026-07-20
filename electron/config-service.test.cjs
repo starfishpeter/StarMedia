@@ -38,6 +38,8 @@ test('creates stable defaults for every known library without persisting on load
   assert.equal(config.scraping.hanime1Endpoint, 'https://hanime1.com')
   assert.deepEqual(config.network, { proxyEnabled: false, proxyUrl: '' })
   assert.equal(config.showExternalSubtitleBadges, false)
+  assert.equal(config.defaultPlaybackMode, 'contain')
+  assert.equal(config.defaultReadingMode, 'page')
   assert.deepEqual(Object.keys(config.libraries), libraryIds)
   assert.equal(
     libraryIds.every(
@@ -58,6 +60,8 @@ test('sanitizes configuration values and removes obsolete classifications', asyn
     mediaRoot: '  C:\\Media  ',
     theme: 'unsupported',
     cacheLimitMb: 4,
+    defaultPlaybackMode: 'invalid',
+    defaultReadingMode: 'invalid',
     showExternalSubtitleBadges: true,
     network: { proxyEnabled: true, proxyUrl: ' 127.0.0.1:8390 ' },
     scraping: {
@@ -84,6 +88,8 @@ test('sanitizes configuration values and removes obsolete classifications', asyn
   assert.equal(config.mediaRoot, 'C:\\Media')
   assert.equal(config.theme, 'dark')
   assert.equal(config.cacheLimitMb, 128)
+  assert.equal(config.defaultPlaybackMode, 'contain')
+  assert.equal(config.defaultReadingMode, 'page')
   assert.equal(config.showExternalSubtitleBadges, true)
   assert.equal(config.scraping.bangumiToken, 'token')
   assert.equal('anidbClient' in config.scraping, false)

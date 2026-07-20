@@ -128,7 +128,6 @@ test('replaces an existing episode without losing its metadata or previous files
     library: 'anime',
     kind: 'video',
     title: '第 1 话',
-    grouping: '',
     affiliation: '测试合集',
     episode: '第 1 话',
     tags: ['保留标签'],

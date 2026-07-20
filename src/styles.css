@@ -383,6 +383,20 @@ img {
 .media-topbar .search-shell {
   width: 100%;
 }
+.media-topbar {
+  grid-template-columns: minmax(320px, 1fr) auto auto auto;
+}
+.topbar .topbar-refresh-button {
+  -webkit-app-region: no-drag;
+}
+.spinning-icon {
+  animation: spinning-icon 0.8s linear infinite;
+}
+@keyframes spinning-icon {
+  to {
+    transform: rotate(360deg);
+  }
+}
 
 .window-copy {
   display: flex;
@@ -1568,6 +1582,23 @@ select:focus {
   flex-wrap: wrap;
   gap: 8px;
   margin: 2px 0;
+}
+.collection-action-toggle {
+  height: 34px;
+  padding: 0 13px;
+  border-radius: 999px;
+}
+.collection-action-toggle .toolbar-switch {
+  width: 34px;
+  height: 20px;
+  flex-basis: 34px;
+}
+.collection-action-toggle .toolbar-switch::after {
+  width: 14px;
+  height: 14px;
+}
+.collection-action-toggle input:checked + .toolbar-switch::after {
+  transform: translateX(14px);
 }
 
 .collection-note {
@@ -2896,8 +2927,52 @@ select:focus {
   display: grid;
   gap: 10px;
 }
-.window-confirm-toggle {
+.application-switch-toggle {
+  height: 38px;
+  gap: 10px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
   margin: 0;
+}
+.application-switch-toggle:hover {
+  border: 0;
+  background: transparent;
+}
+.application-switch-toggle .toolbar-toggle-label {
+  color: var(--text);
+  font-size: 14px;
+}
+.application-switch-toggle .toolbar-toggle-state {
+  font-size: 13px;
+}
+.playback-mode-selector {
+  width: fit-content;
+  display: inline-flex;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--field);
+}
+.playback-mode-selector button {
+  min-width: 104px;
+  height: 36px;
+  padding: 0 14px;
+  color: var(--text-secondary);
+  font-size: 12px;
+  border-radius: 0;
+  background: transparent;
+}
+.playback-mode-selector button + button {
+  border-left: 1px solid var(--line);
+}
+.playback-mode-selector button:hover:not(.active) {
+  background: var(--panel);
+}
+.playback-mode-selector button.active {
+  color: var(--on-accent);
+  background: var(--accent);
 }
 .application-cache-section {
   display: grid;
@@ -3830,6 +3905,8 @@ select:focus {
 .video-stage {
   min-height: 0;
   overflow: hidden;
+  user-select: none;
+  -webkit-user-select: none;
   background: radial-gradient(circle at 50% 0%, rgba(41, 151, 255, 0.08), transparent 42%), #080b10;
 }
 .video-frame {
@@ -3909,6 +3986,8 @@ select:focus {
   transition:
     opacity 0.18s ease,
     transform 0.18s ease;
+  user-select: none;
+  -webkit-user-select: none;
 }
 .video-overlay.controls-hidden .video-controls {
   opacity: 0;
@@ -4018,7 +4097,7 @@ select:focus {
     padding: 0 24px;
   }
   .media-topbar {
-    grid-template-columns: minmax(260px, 1fr) auto auto;
+    grid-template-columns: minmax(260px, 1fr) auto auto auto;
   }
   .library-page,
   .utility-page {

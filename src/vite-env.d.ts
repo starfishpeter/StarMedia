@@ -2,6 +2,8 @@
 
 type StarMediaConfigLibraryId = 'erAnime' | 'anime' | 'creator' | 'books' | 'comics' | 'general'
 type StarMediaTheme = 'dark' | 'light' | 'blue'
+type StarMediaPlaybackMode = 'contain' | 'theater'
+type StarMediaReadingMode = 'page' | 'scroll'
 type StarMediaSortMode = 'title' | 'releaseDate' | 'firstAired'
 type StarMediaSortDirection = 'ascending' | 'descending'
 
@@ -23,6 +25,8 @@ interface StarMediaConfig {
   theme: StarMediaTheme
   cacheLimitMb: number
   confirmBeforeClose: boolean
+  defaultPlaybackMode: StarMediaPlaybackMode
+  defaultReadingMode: StarMediaReadingMode
   showExternalSubtitleBadges: boolean
   network: {
     proxyEnabled: boolean
@@ -314,7 +318,12 @@ interface Window {
       creator?: string
       releaseDate?: string
     }) => Promise<StarMediaLibraryResult & { item: import('./data').MediaItem }>
-    updateVideoEpisode?: (input: { id: string; episode: string }) => Promise<StarMediaLibraryResult & { item: import('./data').MediaItem }>
+    updateVideoEpisode?: (input: {
+      id: string
+      episode: string
+      episodeTitle?: string
+      episodeTitleSource?: 'bangumi' | 'manual'
+    }) => Promise<StarMediaLibraryResult & { item: import('./data').MediaItem }>
     updateBookShelves?: (input: {
       ids: string[]
       shelf: string

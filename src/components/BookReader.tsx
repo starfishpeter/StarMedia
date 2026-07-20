@@ -7,6 +7,7 @@ export function BookReader({
   pages,
   status,
   errorMessage,
+  defaultMode,
   onClose,
 }: {
   item: MediaItem
@@ -14,9 +15,10 @@ export function BookReader({
   pages: StarMediaBookPage[]
   status: 'idle' | 'loading' | 'ready' | 'error'
   errorMessage: string
+  defaultMode: StarMediaReadingMode
   onClose: () => void
 }) {
-  const [mode, setMode] = useState<'scroll' | 'page'>('page')
+  const [mode, setMode] = useState<StarMediaReadingMode>(defaultMode)
   const [zoom, setZoom] = useState(1)
   const [pageIndex, setPageIndex] = useState(0)
   const [pageViewport, setPageViewport] = useState({ width: 0, height: 0 })
@@ -28,12 +30,13 @@ export function BookReader({
   const prefetchRequestedRef = useRef(new Set<string>())
 
   useEffect(() => {
+    setMode(defaultMode)
     setPageIndex(0)
     setZoom(1)
     setPageImageSize(null)
     setScrollImageSizes({})
     setScrollPrefetchCursor(0)
-  }, [item.id])
+  }, [defaultMode, item.id])
 
   useEffect(() => {
     prefetchRequestedRef.current.clear()
@@ -121,7 +124,7 @@ export function BookReader({
     setZoom((current) => Math.max(0.5, Math.min(3, Math.round((current + delta) * 100) / 100)))
   }
 
-  function changeMode(nextMode: 'scroll' | 'page') {
+  function changeMode(nextMode: StarMediaReadingMode) {
     setMode(nextMode)
     setZoom(1)
     if (nextMode === 'page') setPageIndex((current) => Math.min(current, Math.max(0, pages.length - 1)))

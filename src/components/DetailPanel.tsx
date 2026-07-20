@@ -1,10 +1,25 @@
 import { BookOpenText, ExternalLink, FilePenLine, Play, RefreshCw, Trash2, X } from 'lucide-react'
 import { useEffect, useState, type CSSProperties } from 'react'
 import { libraryById, type MediaItem } from '../data'
-import { getEpisodeCover, getMediaAffiliation, getMediaEpisode, getMediaEpisodeName, getMediaShelf } from '../domain/media'
+import {
+  formatBangumiEpisodeTitle,
+  getEpisodeCover,
+  getMediaAffiliation,
+  getMediaEpisode,
+  getMediaEpisodeName,
+  getMediaShelf,
+} from '../domain/media'
 import { TagEditor } from './TagEditor'
 
 type VideoPlaybackAvailability = 'checking' | 'supported' | 'unsupported'
+
+function getWindowsSafeFileName(value: string) {
+  return value.replace(
+    /[\\/:*?"<>|]/g,
+    (character) =>
+      ({ '\\': '＼', '/': '／', ':': '：', '*': '＊', '?': '？', '"': '＂', '<': '＜', '>': '＞', '|': '｜' })[character] ?? '＿',
+  )
+}
 
 function getVideoFormat(item: MediaItem) {
   const extension = item.sourcePath?.match(/\.([^.\\/]+)$/)?.[1]
@@ -13,6 +28,7 @@ function getVideoFormat(item: MediaItem) {
 
 export function DetailPanel({
   item,
+  includeEpisodePrefix = true,
   availableTags,
   onUpdateTags,
   onAddTag,
@@ -29,11 +45,17 @@ export function DetailPanel({
   onOpenExternal,
 }: {
   item: MediaItem
+  includeEpisodePrefix?: boolean
   availableTags: string[]
   onUpdateTags: (item: MediaItem, tags: string[]) => void
   onAddTag?: (item: MediaItem, tag: string) => Promise<void>
   onUpdateBookMetadata: (item: MediaItem, metadata: { creator: string; releaseDate: string }) => Promise<void>
-  onUpdateVideoEpisode: (item: MediaItem, episode: string) => Promise<MediaItem | undefined>
+  onUpdateVideoEpisode: (
+    item: MediaItem,
+    episode: string,
+    episodeTitle?: string,
+    episodeTitleSource?: 'bangumi' | 'manual',
+  ) => Promise<MediaItem | undefined>
   onUpdateVideoReleaseDate: (item: MediaItem, releaseDate: string) => Promise<MediaItem | undefined>
   onApplyBangumiEpisode: (item: MediaItem, episodeId: string) => Promise<MediaItem | undefined>
   onOpenExternalUrl: (url: string) => void
@@ -134,11 +156,12 @@ export function DetailPanel({
   }
 
   async function renameToBangumiTitle() {
-    const episodeTitle = item.episodeTitle?.trim()
-    if (!episodeTitle || episodeTitle === getMediaEpisodeName(item)) return
+    const episodeTitle = formatBangumiEpisodeTitle(item, includeEpisodePrefix)
+    const fileName = getWindowsSafeFileName(episodeTitle)
+    if (!episodeTitle || fileName === getMediaEpisodeName(item)) return
     setEpisodeRenaming(true)
     try {
-      const current = await onUpdateVideoEpisode(item, episodeTitle)
+      const current = await onUpdateVideoEpisode(item, fileName, episodeTitle, 'bangumi')
       if (current) setEpisode(getMediaEpisodeName(current))
     } finally {
       setEpisodeRenaming(false)
@@ -163,7 +186,7 @@ export function DetailPanel({
           <span className="detail-library" style={{ color: library.color }}>
             {library.label}
           </span>
-          <h2>{isBook ? item.title : getMediaEpisode(item)}</h2>
+          <h2>{isBook ? item.title : getMediaEpisode(item, includeEpisodePrefix)}</h2>
           {(isBook ? item.note : item.episodeNote) && <p className="detail-note">{isBook ? item.note : item.episodeNote}</p>}
           <div className="detail-actions">
             {isBook && (
@@ -267,16 +290,17 @@ export function DetailPanel({
                   </button>
                 )}
               </div>
-              {item.episodeTitle?.trim() && item.episodeTitle.trim() !== getMediaEpisodeName(item) && (
-                <button
-                  className="secondary-button small-button detail-bangumi-rename-button"
-                  onClick={() => void renameToBangumiTitle()}
-                  disabled={episodeRenaming}
-                >
-                  <FilePenLine size={14} />
-                  {episodeRenaming ? '重命名中…' : '使用 Bangumi 标题重命名'}
-                </button>
-              )}
+              {formatBangumiEpisodeTitle(item, includeEpisodePrefix) &&
+                getWindowsSafeFileName(formatBangumiEpisodeTitle(item, includeEpisodePrefix)) !== getMediaEpisodeName(item) && (
+                  <button
+                    className="secondary-button small-button detail-bangumi-rename-button"
+                    onClick={() => void renameToBangumiTitle()}
+                    disabled={episodeRenaming}
+                  >
+                    <FilePenLine size={14} />
+                    {episodeRenaming ? '重命名中…' : '使用 Bangumi 标题重命名'}
+                  </button>
+                )}
             </section>
           )}
           {isBook && editing && (
@@ -314,7 +338,7 @@ export function DetailPanel({
                 </div>
                 <div>
                   <dt>选集</dt>
-                  <dd>{getMediaEpisode(item)}</dd>
+                  <dd>{getMediaEpisode(item, includeEpisodePrefix)}</dd>
                 </div>
               </>
             )}

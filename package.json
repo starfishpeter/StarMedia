@@ -1,21 +1,22 @@
 {
   "name": "starmedia",
   "private": true,
-  "version": "0.7.7",
+  "version": "0.7.8",
   "description": "A local-first Windows media library prototype.",
   "main": "electron/main.cjs",
   "scripts": {
     "dev": "npm run copy:libass && concurrently --kill-others-on-fail \"vite --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && electron .\"",
     "test": "npm run test:renderer && npm run test:main",
     "test:renderer": "vitest run src",
-    "test:main": "node --test electron/archive-reader-cache-service.test.cjs electron/archive-tooling.test.cjs electron/book-cover-thumbnail-service.test.cjs electron/cache-service.test.cjs electron/config-service.test.cjs electron/desktop-dialog-service.test.cjs electron/file-operations.test.cjs electron/github-update-service.test.cjs electron/import-plan-scan-service.test.cjs electron/import-service.test.cjs electron/ipc-channels.test.cjs electron/library-definitions.test.cjs electron/library-file-layout-service.test.cjs electron/library-maintenance-service.test.cjs electron/library-metadata-service.test.cjs electron/library-store.test.cjs electron/library-transfer-service.test.cjs electron/local-update-service.test.cjs electron/main-ipc.test.cjs electron/matroska-subtitle-service.test.cjs electron/media-directory-maintenance-service.test.cjs electron/operation-queue.test.cjs electron/portable-data-service.test.cjs electron/preload-bridge.test.cjs electron/scraper-adapters.test.cjs electron/scraper-application-service.test.cjs electron/subtitle-cache-service.test.cjs electron/system-network-service.test.cjs electron/thumbnail-service.test.cjs electron/video-service.test.cjs electron/windows-thumbnail-service.test.cjs",
+    "test:main": "node --test electron/archive-reader-cache-service.test.cjs electron/archive-tooling.test.cjs electron/book-cover-thumbnail-service.test.cjs electron/cache-service.test.cjs electron/config-service.test.cjs electron/desktop-dialog-service.test.cjs electron/file-operations.test.cjs electron/github-update-service.test.cjs electron/import-plan-scan-service.test.cjs electron/import-service.test.cjs electron/ipc-channels.test.cjs electron/library-definitions.test.cjs electron/library-file-layout-service.test.cjs electron/library-maintenance-service.test.cjs electron/library-metadata-service.test.cjs electron/library-store.test.cjs electron/library-transfer-service.test.cjs electron/local-update-service.test.cjs electron/main-ipc.test.cjs electron/matroska-subtitle-service.test.cjs electron/media-directory-maintenance-service.test.cjs electron/operation-queue.test.cjs electron/portable-data-service.test.cjs electron/preload-bridge.test.cjs electron/scraper-adapters.test.cjs electron/scraper-application-service.test.cjs electron/subtitle-cache-service.test.cjs electron/system-network-service.test.cjs electron/thumbnail-service.test.cjs electron/video-service.test.cjs electron/windows-thumbnail-service.test.cjs scripts/copy-libass-assets.test.cjs",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
+    "check:changelog": "node scripts/check-changelog.cjs",
     "build:web": "npm run copy:libass && vite build",
     "copy:libass": "node scripts/copy-libass-assets.cjs",
     "lint": "eslint src electron scripts",
     "format:check": "prettier --check src electron scripts eslint.config.js package.json tsconfig.json tsconfig.app.json vite.config.ts index.html",
     "format": "prettier --write src electron scripts eslint.config.js package.json tsconfig.json tsconfig.app.json vite.config.ts index.html",
-    "package:win": "npm test && npm run typecheck && npm run lint && npm run format:check && npm run build:web && node scripts/package-portable.cjs"
+    "package:win": "npm test && npm run typecheck && npm run lint && npm run format:check && npm run check:changelog && npm run build:web && node scripts/package-portable.cjs"
   },
   "dependencies": {
     "7zip-bin": "^5.2.0",

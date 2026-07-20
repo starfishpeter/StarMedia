@@ -10,7 +10,7 @@ function getVideoStorageFolderName(item) {
 }
 
 function getItemAffiliation(item) {
-  return typeof item?.affiliation === 'string' && item.affiliation.trim() ? item.affiliation.trim() : item?.grouping || '未归入合集'
+  return typeof item?.affiliation === 'string' && item.affiliation.trim() ? item.affiliation.trim() : '未归入合集'
 }
 
 function getTransferTargetPath(item, targetRoot) {

@@ -1,8 +1,10 @@
 import {
   Database,
+  BookOpenText,
   FolderOpen,
   HardDrive,
   LibraryBig,
+  MonitorPlay,
   Network,
   PackageOpen,
   Plus,
@@ -188,14 +190,78 @@ export function SettingsView({
                   </div>
                 </div>
                 <div className="application-setting-control application-close-controls">
-                  <label className="toggle-pill window-confirm-toggle">
+                  <label className="toolbar-toggle application-switch-toggle" aria-label="关闭前确认">
+                    <span className="toolbar-toggle-label">关闭前确认</span>
+                    <span className="toolbar-toggle-state">{config.confirmBeforeClose ? '开' : '关'}</span>
                     <input
                       type="checkbox"
                       checked={config.confirmBeforeClose}
                       onChange={(event) => onChange({ ...config, confirmBeforeClose: event.target.checked })}
                     />
-                    关闭前确认
+                    <span className="toolbar-switch" aria-hidden="true" />
                   </label>
+                </div>
+              </section>
+              <section className="application-settings-section">
+                <div className="card-title">
+                  <MonitorPlay size={18} />
+                  <div>
+                    <h2>默认播放模式</h2>
+                    <p>下次应用内播放时使用。</p>
+                  </div>
+                </div>
+                <div className="application-setting-control">
+                  <div className="playback-mode-selector" role="radiogroup" aria-label="默认播放模式">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={config.defaultPlaybackMode === 'contain'}
+                      className={config.defaultPlaybackMode === 'contain' ? 'active' : ''}
+                      onClick={() => onChange({ ...config, defaultPlaybackMode: 'contain' })}
+                    >
+                      适应窗口
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={config.defaultPlaybackMode === 'theater'}
+                      className={config.defaultPlaybackMode === 'theater' ? 'active' : ''}
+                      onClick={() => onChange({ ...config, defaultPlaybackMode: 'theater' })}
+                    >
+                      影院模式
+                    </button>
+                  </div>
+                </div>
+              </section>
+              <section className="application-settings-section">
+                <div className="card-title">
+                  <BookOpenText size={18} />
+                  <div>
+                    <h2>默认阅读模式</h2>
+                    <p>下次打开本子或漫画时使用。</p>
+                  </div>
+                </div>
+                <div className="application-setting-control">
+                  <div className="playback-mode-selector" role="radiogroup" aria-label="默认阅读模式">
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={config.defaultReadingMode === 'page'}
+                      className={config.defaultReadingMode === 'page' ? 'active' : ''}
+                      onClick={() => onChange({ ...config, defaultReadingMode: 'page' })}
+                    >
+                      单页
+                    </button>
+                    <button
+                      type="button"
+                      role="radio"
+                      aria-checked={config.defaultReadingMode === 'scroll'}
+                      className={config.defaultReadingMode === 'scroll' ? 'active' : ''}
+                      onClick={() => onChange({ ...config, defaultReadingMode: 'scroll' })}
+                    >
+                      滚动
+                    </button>
+                  </div>
                 </div>
               </section>
               <section className="application-settings-section">

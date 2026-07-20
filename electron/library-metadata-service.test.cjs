@@ -278,6 +278,69 @@ test('rolls video episode files and sidecars back when saving metadata fails', a
   await assert.rejects(fs.access(targetSidecarPath), { code: 'ENOENT' })
 })
 
+test('uses a manual video name as the displayed episode title after renaming', async (t) => {
+  const root = await createSandbox(t)
+  const libraryRoot = path.join(root, 'anime')
+  const sourcePath = path.join(libraryRoot, 'Collection', '#01.mp4')
+  await writeFile(sourcePath, 'video')
+  const item = {
+    id: 'video:1',
+    library: 'anime',
+    kind: 'video',
+    title: '#01',
+    episode: '#01',
+    episodeTitle: 'Bangumi title',
+    affiliation: 'Collection',
+    sourcePath,
+    sidecars: [],
+  }
+  let saved
+  const service = createService({
+    config: { libraries: { anime: { rootPath: libraryRoot } } },
+    library: { items: [item], operations: [] },
+    saveLibrary: async (data) => {
+      saved = data
+      return { data, libraryPath: 'index.json' }
+    },
+  })
+
+  const result = await service.updateVideoEpisode({ id: item.id, episode: '#01 Manual title' })
+
+  assert.equal(result.item.episodeTitle, '#01 Manual title')
+  assert.equal(result.item.episodeTitleSource, 'manual')
+  assert.equal(saved.items[0].episode, '#01 Manual title')
+  assert.equal(await fs.readFile(path.join(libraryRoot, 'Collection', '#01 Manual title.mp4'), 'utf8'), 'video')
+})
+
+test('keeps a Bangumi display title while sanitizing its physical filename', async (t) => {
+  const root = await createSandbox(t)
+  const libraryRoot = path.join(root, 'anime')
+  const sourcePath = path.join(libraryRoot, 'Collection', '#04.mp4')
+  await writeFile(sourcePath, 'video')
+  const item = {
+    id: 'video:1',
+    library: 'anime',
+    kind: 'video',
+    title: '#04',
+    episode: '#04',
+    affiliation: 'Collection',
+    sourcePath,
+    sidecars: [],
+  }
+  const service = createService({
+    config: { libraries: { anime: { rootPath: libraryRoot } } },
+    library: { items: [item], operations: [] },
+    saveLibrary: async (data) => ({ data, libraryPath: 'index.json' }),
+  })
+
+  const result = await service.updateVideoEpisode({ id: item.id, episode: '#04 Question？', episodeTitle: '#04 Question?' })
+
+  assert.equal(result.item.episode, '#04 Question？')
+  assert.equal(result.item.episodeTitle, '#04 Question?')
+  assert.equal(result.item.episodeTitleSource, 'manual')
+  assert.equal(await fs.readFile(path.join(libraryRoot, 'Collection', '#04 Question？.mp4'), 'utf8'), 'video')
+})
+
 test('rolls moved affiliation files and sidecars back when saving metadata fails', async (t) => {
   const root = await createSandbox(t)
   const libraryRoot = path.join(root, 'anime')

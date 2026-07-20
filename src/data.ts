@@ -17,7 +17,6 @@ export interface MediaItem {
   id: string
   library: LibraryId
   title: string
-  grouping: string
   affiliation?: string
   shelf?: string
   episode?: string
@@ -29,6 +28,7 @@ export interface MediaItem {
   cover: string
   episodeCover?: string
   episodeTitle?: string
+  episodeTitleSource?: 'bangumi' | 'manual'
   episodeNote?: string
   episodeAiredAt?: string
   hasEmbeddedSubtitles?: boolean
@@ -51,6 +51,9 @@ export interface MediaItem {
   bangumiUrl?: string
   bangumiEpisodeId?: string
   bangumiEpisodeUrl?: string
+  bangumiEpisodeSort?: number
+  bangumiEpisodeType?: number
+  bangumiEpisodeLabel?: 'sp' | 'ova'
   freeAnimeHentaiId?: string
   freeAnimeHentaiUrl?: string
   hanime1Id?: string

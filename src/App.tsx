@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, FolderInput, Maximize2, Minus, Search, Settings, Tags, X } from 'lucide-react'
+import { Check, FolderInput, Maximize2, Minus, RefreshCw, Search, Settings, Tags, X } from 'lucide-react'
 import { libraries, libraryById, type LibraryId, type MediaItem, type NavigationId } from './data'
 import { MediaBatchMenu } from './components/MediaBatchMenu'
 import { DetailPanel } from './components/DetailPanel'
@@ -40,6 +40,8 @@ const fallbackConfig: StarMediaConfig = {
   theme: 'dark',
   cacheLimitMb: 4096,
   confirmBeforeClose: true,
+  defaultPlaybackMode: 'contain',
+  defaultReadingMode: 'page',
   showExternalSubtitleBadges: false,
   network: {
     proxyEnabled: false,
@@ -98,6 +100,7 @@ function App() {
   const [configMeta, setConfigMeta] = useState({ dataRoot: '', configPath: '', backupDir: '', cacheDir: '' })
   const [libraryItems, setLibraryItems] = useState<MediaItem[]>([])
   const [libraryUsageBytes, setLibraryUsageBytes] = useState<number | null>(null)
+  const [libraryRefreshing, setLibraryRefreshing] = useState(false)
   const [importSources, setImportSources] = useState<string[]>([])
   const [importLibrary, setImportLibrary] = useState<ImportTarget>('auto')
   const [importPlan, setImportPlan] = useState<StarMediaImportPlan | null>(null)
@@ -196,7 +199,6 @@ function App() {
         !normalizedQuery ||
         [
           item.title,
-          item.grouping,
           getMediaAffiliation(item),
           getMediaEpisode(item),
           item.creator,
@@ -333,6 +335,25 @@ function App() {
       noticeTimerRef.current = null
       setNotice(null)
     }, 2600)
+  }
+
+  async function refreshLibrary() {
+    if (!window.starMedia?.getLibrary || libraryRefreshing) return
+    setLibraryRefreshing(true)
+    try {
+      const result = await window.starMedia.getLibrary()
+      const refreshedItems = new Map(result.data.items.map((item) => [item.id, item]))
+      const refreshOpenItem = (item: MediaItem | null) => (item ? (refreshedItems.get(item.id) ?? null) : null)
+      setLibraryItems(result.data.items)
+      setSelectedItem(refreshOpenItem)
+      setPlayerItem(refreshOpenItem)
+      notify('媒体库已刷新，外挂字幕标记已更新。')
+    } catch (error) {
+      console.error(error)
+      notify(error instanceof Error ? `刷新媒体库失败：${error.message}` : '刷新媒体库失败。')
+    } finally {
+      setLibraryRefreshing(false)
+    }
   }
 
   async function persistConfig(draft: StarMediaConfig) {
@@ -1134,10 +1155,15 @@ function App() {
     if (!(await updateTags(item, nextTags))) throw new Error('标签保存失败')
   }
 
-  async function updateVideoEpisode(item: MediaItem, episode: string) {
+  async function updateVideoEpisode(item: MediaItem, episode: string, episodeTitle?: string, episodeTitleSource?: 'bangumi' | 'manual') {
     if (!window.starMedia?.updateVideoEpisode) return
     try {
-      const result = await window.starMedia.updateVideoEpisode({ id: item.id, episode })
+      const result = await window.starMedia.updateVideoEpisode({
+        id: item.id,
+        episode,
+        ...(episodeTitle ? { episodeTitle } : {}),
+        ...(episodeTitleSource ? { episodeTitleSource } : {}),
+      })
       setLibraryItems(result.data.items)
       setSelectedItem((current) => (current?.id === item.id ? result.item : current))
       setReaderItem((current) => (current?.id === item.id ? result.item : current))
@@ -1518,6 +1544,14 @@ function App() {
                     ...libraries.map((library) => ({ value: library.id, label: library.label })),
                   ]}
                 />
+                <button
+                  className="secondary-button small-button topbar-refresh-button"
+                  disabled={libraryRefreshing}
+                  onClick={() => void refreshLibrary()}
+                >
+                  <RefreshCw size={15} className={libraryRefreshing ? 'spinning-icon' : undefined} />
+                  {libraryRefreshing ? '刷新中…' : '刷新媒体库'}
+                </button>
               </>
             ) : (
               <div className="window-drag-region" aria-hidden="true" />
@@ -1688,6 +1722,14 @@ function App() {
       {selectedItem && (
         <DetailPanel
           item={selectedItem}
+          includeEpisodePrefix={
+            libraryItems.filter(
+              (candidate) =>
+                candidate.kind === 'video' &&
+                candidate.library === selectedItem.library &&
+                getMediaAffiliation(candidate) === getMediaAffiliation(selectedItem),
+            ).length > 1
+          }
           availableTags={config.catalog.tags}
           onUpdateTags={(item, tags) =>
             void (item.library === 'creator' || item.library === 'general' ? updateMediaTags(item, tags) : updateContainerTags(item, tags))
@@ -1713,6 +1755,7 @@ function App() {
           pages={readerPages}
           status={readerStatus}
           errorMessage={readerError}
+          defaultMode={config.defaultReadingMode}
           onClose={closeBookReader}
         />
       )}
@@ -1724,6 +1767,7 @@ function App() {
           subtitles={videoSubtitles}
           status={videoPlayerStatus}
           errorMessage={videoPlayerError}
+          defaultFitMode={config.defaultPlaybackMode}
           onClose={closeVideoPlayer}
           onOpenExternal={openVideoExternally}
           onMetadata={saveVideoMetadata}

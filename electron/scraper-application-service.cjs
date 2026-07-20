@@ -38,10 +38,83 @@ function normalizeScrapedFolderName(value, fallback, label = '刮削名称') {
   }
 }
 
-function getEpisodeNumber(item) {
+function getLocalEpisodeReference(item) {
   const value = getItemEpisode(item)
-  const match = value.match(/(?:^|[^a-z0-9])(?:ep(?:isode)?\s*)?0*(\d{1,3})(?:$|[^a-z0-9])/i)
-  return match ? Number(match[1]) : null
+  const specialMatch = value.match(/(?:[#＃]\s*|\b)(SP|OVA)\s*0*(\d{1,3})(?:$|[^a-z0-9])/i)
+  if (specialMatch) return { category: 'special', label: specialMatch[1].toLowerCase(), number: Number(specialMatch[2]) }
+  if (/(?:[#＃]\s*|\b)(?:SP|OVA)\b/i.test(value)) return { category: 'special', label: '', number: null }
+  const explicitMatch = value.match(/(?:[#＃]\s*|\bep(?:isode)?\s*|第\s*)0*(\d{1,3})(?:\s*(?:话|集|話|話目))?(?:$|[^a-z0-9])/i)
+  if (explicitMatch) return { category: 'regular', number: Number(explicitMatch[1]) }
+  const match = value.match(/(?:^|[^a-z0-9])0*(\d{1,3})(?:$|[^a-z0-9])/i)
+  return { category: 'regular', number: match ? Number(match[1]) : null }
+}
+
+function getBangumiEpisodeSort(episode) {
+  const sort = Number(episode?.sort)
+  if (Number.isFinite(sort) && sort > 0) return sort
+  const ep = Number(episode?.ep)
+  return Number.isFinite(ep) && ep > 0 ? ep : undefined
+}
+
+function getBangumiEpisodeType(episode) {
+  const type = Number(episode?.type)
+  return Number.isInteger(type) && type >= 0 ? type : 0
+}
+
+function hasEpisodeNumber(title, episodeSort) {
+  const normalized = title.replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xff10 + 0x30)).replaceAll('＃', '#')
+  if (new RegExp(`(?:^|[^A-Za-z0-9])#?\\s*0*${episodeSort}(?![0-9])`, 'i').test(normalized)) return true
+  return parseLeadingChineseEpisodeNumber(normalized) === episodeSort
+}
+
+function parseLeadingChineseEpisodeNumber(title) {
+  const match = String(title).match(/^第?\s*([零〇一二三四五六七八九十百千万两]+)/)
+  if (!match) return null
+  const digits = { 零: 0, 〇: 0, 一: 1, 二: 2, 三: 3, 四: 4, 五: 5, 六: 6, 七: 7, 八: 8, 九: 9, 两: 2 }
+  const units = { 十: 10, 百: 100, 千: 1000, 万: 10000 }
+  let total = 0
+  let section = 0
+  let current = 0
+  for (const character of match[1]) {
+    if (digits[character] !== undefined) {
+      current = digits[character]
+      continue
+    }
+    const unit = units[character]
+    if (unit === 10000) {
+      total += (section + current || 1) * unit
+      section = 0
+      current = 0
+      continue
+    }
+    section += (current || 1) * unit
+    current = 0
+  }
+  const result = total + section + current
+  return result > 0 ? result : null
+}
+
+function formatBangumiEpisodeTitle(episode, includeEpisodePrefix = true, specialLabel = 'sp') {
+  const title = normalizeScrapedField(episode?.name, 200)
+  const sort = getBangumiEpisodeSort(episode)
+  const isSpecial = getBangumiEpisodeType(episode) === 1
+  const normalizedTitle = isSpecial && Number.isInteger(sort) && sort > 0 ? stripSpecialEpisodeLabel(title, sort) : title
+  if (!includeEpisodePrefix || !title || !Number.isInteger(sort) || sort <= 0) return normalizedTitle
+  if (isSpecial && hasSpecialEpisodePrefix(title, sort)) return title
+  if (!isSpecial && hasEpisodeNumber(title, sort)) return normalizedTitle
+  return `${isSpecial ? `#${specialLabel.toUpperCase()}` : '#'}${String(sort).padStart(2, '0')} ${normalizedTitle}`
+}
+
+function hasSpecialEpisodePrefix(title, episodeSort) {
+  return new RegExp(`^#?\\s*(?:SP|OVA)\\s*0*${episodeSort}(?![0-9])`, 'i').test(String(title).replaceAll('＃', '#'))
+}
+
+function stripSpecialEpisodeLabel(title, episodeSort) {
+  return (
+    String(title)
+      .replace(new RegExp(`^\\s*#?\\s*(?:SP|OVA|Special)\\s*[.．#＃-]?\\s*0*${episodeSort}(?![0-9])\\s*`, 'i'), '')
+      .trim() || title
+  )
 }
 
 function imageExtensionFromResponse(response, imageUrl) {
@@ -211,17 +284,47 @@ function createScraperApplicationService({
     const selected = library.items.find((item) => item?.id === id)
     if (!selected || selected.kind !== 'video' || !isPosterLibrary(selected.library)) throw new Error('只能为番剧或里番合集分配章节')
     const affiliation = getItemAffiliation(selected)
-    const episodesByNumber = new Map(
-      episodes.filter((episode) => episode.type === 0 && episode.ep > 0).map((episode) => [episode.ep, episode]),
+    const containerItems = library.items.filter(
+      (item) => item?.kind === 'video' && item.library === selected.library && getItemAffiliation(item) === affiliation,
     )
+    const regularEpisodes = episodes.filter((episode) => episode.type === 0 && episode.ep > 0)
+    const specialEpisodes = episodes.filter((episode) => episode.type === 1 && getBangumiEpisodeSort(episode))
+    const episodesByNumber = new Map(regularEpisodes.map((episode) => [episode.ep, episode]))
+    const specialEpisodesByNumber = new Map(specialEpisodes.map((episode) => [getBangumiEpisodeSort(episode), episode]))
+    const singleEpisode = containerItems.length === 1 && regularEpisodes.length === 1 ? regularEpisodes[0] : null
     let assignedCount = 0
     const items = library.items.map((item) => {
       if (item?.kind !== 'video' || item.library !== selected.library || getItemAffiliation(item) !== affiliation) return item
-      const matchedEpisode = episodesByNumber.get(getEpisodeNumber(item))
-      if (!matchedEpisode) return item
-      if (item.bangumiEpisodeId === String(matchedEpisode.id) && item.bangumiEpisodeUrl === matchedEpisode.url) return item
+      const reference = getLocalEpisodeReference(item)
+      const matchedEpisode =
+        reference.category === 'special'
+          ? reference.number === null
+            ? null
+            : specialEpisodesByNumber.get(reference.number)
+          : (singleEpisode ?? episodesByNumber.get(reference.number))
+      if (!matchedEpisode) {
+        if (reference.category !== 'special') return item
+        const { bangumiEpisodeId, bangumiEpisodeUrl, bangumiEpisodeSort, bangumiEpisodeType, bangumiEpisodeLabel, ...unassigned } = item
+        return bangumiEpisodeId || bangumiEpisodeUrl || bangumiEpisodeSort || bangumiEpisodeType !== undefined || bangumiEpisodeLabel
+          ? unassigned
+          : item
+      }
+      const bangumiEpisodeSort = getBangumiEpisodeSort(matchedEpisode)
+      if (
+        item.bangumiEpisodeId === String(matchedEpisode.id) &&
+        item.bangumiEpisodeUrl === matchedEpisode.url &&
+        item.bangumiEpisodeSort === bangumiEpisodeSort
+      )
+        return item
       assignedCount += 1
-      return { ...item, bangumiEpisodeId: String(matchedEpisode.id), bangumiEpisodeUrl: matchedEpisode.url }
+      return {
+        ...item,
+        bangumiEpisodeId: String(matchedEpisode.id),
+        bangumiEpisodeUrl: matchedEpisode.url,
+        bangumiEpisodeSort,
+        bangumiEpisodeType: getBangumiEpisodeType(matchedEpisode),
+        ...(reference.category === 'special' && reference.label ? { bangumiEpisodeLabel: reference.label } : {}),
+      }
     })
     const saved = await saveLibrary({ items, operations: library.operations }, { backupExisting: false })
     return { ...saved, assignedCount }
@@ -308,12 +411,22 @@ function createScraperApplicationService({
     const [episode, library] = await Promise.all([scraperAdapters.getBangumiEpisode(episodeId), loadLibrary()])
     const index = library.items.findIndex((item) => item?.id === id && item.kind === 'video')
     if (!episode || index < 0) throw new Error('Bangumi 单集不存在，或视频记录已移除')
+    const selected = library.items[index]
+    const specialLabel = getLocalEpisodeReference(selected).category === 'special' ? getLocalEpisodeReference(selected).label || 'sp' : 'sp'
+    const isMultiEpisodeContainer =
+      library.items.filter(
+        (item) => item?.kind === 'video' && item.library === selected.library && getItemAffiliation(item) === getItemAffiliation(selected),
+      ).length > 1
     const items = [...library.items]
     items[index] = {
       ...items[index],
       bangumiEpisodeId: String(episode.id),
       bangumiEpisodeUrl: episode.url,
-      episodeTitle: episode.name,
+      bangumiEpisodeSort: getBangumiEpisodeSort(episode),
+      bangumiEpisodeType: getBangumiEpisodeType(episode),
+      ...(getBangumiEpisodeType(episode) === 1 ? { bangumiEpisodeLabel: specialLabel } : {}),
+      episodeTitle: formatBangumiEpisodeTitle(episode, isMultiEpisodeContainer, specialLabel),
+      episodeTitleSource: 'bangumi',
       episodeAiredAt: episode.airdate,
       episodeNote: episode.summary,
     }
@@ -356,4 +469,12 @@ function createScraperApplicationService({
   }
 }
 
-module.exports = { createScraperApplicationService, imageExtensionFromResponse, normalizeScrapedFolderName, resolveScrapeFields }
+module.exports = {
+  createScraperApplicationService,
+  formatBangumiEpisodeTitle,
+  getBangumiEpisodeSort,
+  getBangumiEpisodeType,
+  imageExtensionFromResponse,
+  normalizeScrapedFolderName,
+  resolveScrapeFields,
+}

@@ -125,6 +125,7 @@ async function verifyPortableApplication(rootDirectory) {
     path.join(applicationRoot, 'dist', 'libass', 'fonts', 'noto-sans-cjk-sc-fonts.json'),
     path.join(applicationRoot, 'dist', 'libass', 'fonts', 'Noto-Sans-CJK-SC-OFL.txt'),
     path.join(applicationRoot, 'dist', 'libass', 'fonts', 'NotoSansCJKsc-Regular.otf'),
+    path.join(applicationRoot, 'dist', 'libass', 'fonts', 'NotoSansCJKsc-Bold.otf'),
     path.join(applicationRoot, 'node_modules', '7zip-bin', 'index.js'),
     path.join(applicationRoot, 'node_modules', 'libass-wasm', 'dist', 'js', 'subtitles-octopus.js'),
     path.join(applicationRoot, 'node_modules', 'yauzl', 'index.js'),

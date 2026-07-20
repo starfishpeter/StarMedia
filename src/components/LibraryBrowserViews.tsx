@@ -2,9 +2,10 @@ import { ArrowUpDown, LibraryBig, Search } from 'lucide-react'
 import { Fragment, useEffect, useEffectEvent, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react'
 import { type LibraryDefinition, type MediaItem } from '../data'
 import {
-  compareMediaEpisodes,
+  compareMediaNames,
   compareMediaItems,
   getMediaAffiliation,
+  getMediaEpisode,
   isArchiveLibrary,
   type SortDirection,
   type SortMode,
@@ -284,10 +285,10 @@ export function AffiliationWall({
     )
     .sort(([leftName, , left], [rightName, , right]) => {
       if (sortMode === 'title') {
-        const result = leftName.localeCompare(rightName, 'zh-CN', { numeric: true })
+        const result = compareMediaNames(leftName, rightName)
         return sortDirection === 'ascending' ? result : -result
       }
-      return compareMediaItems(left, right, sortMode, sortDirection) || leftName.localeCompare(rightName, 'zh-CN')
+      return compareMediaItems(left, right, sortMode, sortDirection) || compareMediaNames(leftName, rightName)
     })
   const usesPosterCards = entries[0]?.[1][0]?.library === 'erAnime' || entries[0]?.[1][0]?.library === 'anime'
   return (
@@ -300,7 +301,7 @@ export function AffiliationWall({
       {(group, { selectRange }) => {
         const affiliation = group.key
         const episodes = group.items
-        const coverItem = [...episodes].sort(compareMediaEpisodes)[0]
+        const coverItem = [...episodes].sort((left, right) => compareMediaNames(getMediaEpisode(left), getMediaEpisode(right)))[0]
         return (
           <button
             data-group-key={affiliation}
@@ -470,7 +471,7 @@ export function BookshelfWall({
         ] as const,
     )
     .sort(([leftName, , left], [rightName, , right]) => {
-      return compareMediaItems(left, right, sortMode, sortDirection) || leftName.localeCompare(rightName, 'zh-CN')
+      return compareMediaItems(left, right, sortMode, sortDirection) || compareMediaNames(leftName, rightName)
     })
   const selectedIdSet = new Set(selectedIds)
 

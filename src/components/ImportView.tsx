@@ -378,7 +378,6 @@ function ImportPlanPreview({
       </div>
       <div className="plan-summary-grid">
         <PlanMetric label="媒体项目" value={plan.mediaFileCount} />
-        <PlanMetric label="关联字幕" value={plan.sidecarCount} />
         <PlanMetric label="可导入" value={plan.acceptedCount} tone="ready" />
         <PlanMetric label="需配置" value={plan.blockedCount} tone="blocked" />
         <PlanMetric label="不支持" value={plan.unsupportedCount} tone="unsupported" />

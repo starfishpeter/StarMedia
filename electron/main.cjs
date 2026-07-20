@@ -1,6 +1,5 @@
 const { app, BrowserWindow, Menu, dialog, ipcMain, nativeImage, net, session, shell } = require('electron')
 const fs = require('node:fs/promises')
-const fssync = require('node:fs')
 const { randomUUID } = require('node:crypto')
 const os = require('node:os')
 const path = require('node:path')
@@ -45,12 +44,8 @@ const { createGitHubUpdateService } = require('./github-update-service.cjs')
 
 const isDevelopment = !app.isPackaged
 
-function resolvePortableDataRoot({ development, appPath, executablePath, pathExists = fssync.existsSync }) {
-  if (!development) return path.join(path.dirname(executablePath), 'StarMediaData')
-  const currentRoot = path.join(appPath, 'StarMediaData')
-  const legacyRoot = path.join(appPath, 'scripts', 'StarMediaData')
-  const hasIndex = (root) => pathExists(path.join(root, 'starmedia-config.json')) || pathExists(path.join(root, 'starmedia-library.json'))
-  return !hasIndex(currentRoot) && hasIndex(legacyRoot) ? legacyRoot : currentRoot
+function resolvePortableDataRoot({ development, appPath, executablePath }) {
+  return development ? path.join(appPath, 'StarMediaData') : path.join(path.dirname(executablePath), 'StarMediaData')
 }
 
 const portableDataRoot = resolvePortableDataRoot({
@@ -525,11 +520,6 @@ async function discoverMatchingSidecars(item, directoryEntriesByPath) {
   }
   const entries = await entryTask
   const sourceBaseName = path.basename(sourcePath, path.extname(sourcePath)).toLocaleLowerCase()
-  const knownPaths = new Set(
-    (Array.isArray(item.sidecars) ? item.sidecars : [])
-      .map((sidecar) => (typeof sidecar?.sourcePath === 'string' ? path.resolve(sidecar.sourcePath).toLocaleLowerCase() : ''))
-      .filter(Boolean),
-  )
   const discovered = []
   for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name, 'en'))) {
     if (!entry.isFile()) continue
@@ -537,12 +527,13 @@ async function discoverMatchingSidecars(item, directoryEntriesByPath) {
     if (!supportedSidecarExtensions.has(extension)) continue
     if (path.basename(entry.name, extension).toLocaleLowerCase() !== sourceBaseName) continue
     const sidecarPath = path.join(directoryPath, entry.name)
-    if (knownPaths.has(path.resolve(sidecarPath).toLocaleLowerCase())) continue
     const stat = await fs.stat(sidecarPath).catch(() => null)
     if (!stat?.isFile()) continue
     discovered.push({ fileName: entry.name, sourcePath: sidecarPath, extension, size: stat.size })
   }
-  return discovered.length > 0 ? { ...item, sidecars: [...(Array.isArray(item.sidecars) ? item.sidecars : []), ...discovered] } : item
+  const previousSidecars = Array.isArray(item.sidecars) ? item.sidecars : []
+  if (JSON.stringify(previousSidecars) === JSON.stringify(discovered)) return item
+  return { ...item, sidecars: discovered }
 }
 
 async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
@@ -590,54 +581,6 @@ async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
       item.cover.includes(generatedVideoCoverUrl)
     ) {
       next = { ...next, cover: '', episodeCover: item.cover }
-    }
-    const bangumiId =
-      typeof next?.bangumiId === 'string' && next.bangumiId.trim()
-        ? next.bangumiId.trim()
-        : next?.scraperSource === 'Bangumi' && typeof next?.scraperId === 'string'
-          ? next.scraperId.trim()
-          : ''
-    const legacyHanimeSource = next?.scraperSource === 'Hanime'
-    const freeAnimeHentaiId =
-      typeof next?.freeAnimeHentaiId === 'string' && next.freeAnimeHentaiId.trim()
-        ? next.freeAnimeHentaiId.trim()
-        : legacyHanimeSource && typeof next?.scraperId === 'string' && next.scraperId.trim()
-          ? next.scraperId.trim()
-          : legacyHanimeSource && typeof next?.hanimeId === 'string'
-            ? next.hanimeId.trim()
-            : ''
-    const hanime1Id = typeof next?.hanime1Id === 'string' && next.hanime1Id.trim() ? next.hanime1Id.trim() : ''
-    const normalizedScraperSource = legacyHanimeSource ? 'FreeAnimeHentai' : next?.scraperSource
-    if (bangumiId && next.bangumiId !== bangumiId) next = { ...next, bangumiId }
-    if (freeAnimeHentaiId && next.freeAnimeHentaiId !== freeAnimeHentaiId) next = { ...next, freeAnimeHentaiId }
-    if (hanime1Id && next.hanime1Id !== hanime1Id) next = { ...next, hanime1Id }
-    if (normalizedScraperSource && next.scraperSource !== normalizedScraperSource)
-      next = { ...next, scraperSource: normalizedScraperSource }
-    if (bangumiId && !next.bangumiUrl) next = { ...next, bangumiUrl: `https://bgm.tv/subject/${encodeURIComponent(bangumiId)}` }
-    if (freeAnimeHentaiId && !next.freeAnimeHentaiUrl)
-      next = {
-        ...next,
-        freeAnimeHentaiUrl: legacyHanimeSource
-          ? next.hanimeUrl || next.scraperUrl || `https://hanime.tv/videos/hentai/${encodeURIComponent(freeAnimeHentaiId)}`
-          : `https://hanime.tv/videos/hentai/${encodeURIComponent(freeAnimeHentaiId)}`,
-      }
-    if (hanime1Id && !next.hanime1Url) next = { ...next, hanime1Url: `https://hanime1.com/watch?v=${encodeURIComponent(hanime1Id)}` }
-    if (legacyHanimeSource) {
-      const migrated = { ...next }
-      delete migrated.hanimeId
-      delete migrated.hanimeUrl
-      next = migrated
-    }
-    if (next?.scraperSource === 'AniDB' || next?.anidbId || next?.anidbUrl) {
-      const migrated = { ...next }
-      if (migrated.scraperSource === 'AniDB') {
-        delete migrated.scraperSource
-        delete migrated.scraperId
-        delete migrated.scraperUrl
-      }
-      delete migrated.anidbId
-      delete migrated.anidbUrl
-      next = migrated
     }
     if (next !== item) changed = true
     items.push(next)

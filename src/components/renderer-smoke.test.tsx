@@ -15,7 +15,6 @@ const video: MediaItem = {
   id: 'video:1',
   library: 'anime',
   title: 'Episode 1',
-  grouping: 'Series',
   affiliation: 'Series',
   episode: 'Episode 1',
   tags: ['动作'],
@@ -34,7 +33,6 @@ const book: MediaItem = {
   id: 'book:1',
   library: 'books',
   title: 'Book 1',
-  grouping: '',
   shelf: 'Shelf',
   kind: 'book',
   duration: '32 页',
@@ -134,6 +132,7 @@ describe('renderer component smoke coverage', () => {
           pages={[{ name: 'page-1', url: 'file:///page-1.jpg' }]}
           status="ready"
           errorMessage=""
+          defaultMode="page"
           onClose={noOp}
         />
         <VideoPlayer
@@ -146,6 +145,7 @@ describe('renderer component smoke coverage', () => {
           ]}
           status="ready"
           errorMessage=""
+          defaultFitMode="contain"
           onClose={noOp}
           onOpenExternal={async () => {}}
           onMetadata={noOp}
@@ -169,6 +169,7 @@ describe('renderer component smoke coverage', () => {
     expect(markup).toContain('24:00')
     expect(markup).toContain('适应窗口')
     expect(markup).toContain('影院模式')
+    expect(markup).toContain('class="video-stage"')
     expect(markup).toContain('toolbar-switch')
     expect(markup).toContain('>关<')
     expect(markup).toContain('额外信息')
@@ -178,7 +179,7 @@ describe('renderer component smoke coverage', () => {
   it('offers transactional renaming only when a Bangumi episode title is available', () => {
     const markup = renderToStaticMarkup(
       <DetailPanel
-        item={{ ...video, episode: '#01', episodeTitle: 'Bangumi 原标题' }}
+        item={{ ...video, episode: '#01', episodeTitle: 'Bangumi 原标题', bangumiEpisodeSort: 1 }}
         availableTags={[]}
         onUpdateTags={noOp}
         onUpdateBookMetadata={async () => {}}
@@ -194,7 +195,79 @@ describe('renderer component smoke coverage', () => {
     )
 
     expect(markup).toContain('使用 Bangumi 标题重命名')
+    expect(markup).toContain('#01 Bangumi 原标题')
     expect(markup).not.toContain('不会改动文件名或合集简介')
+  })
+
+  it('omits an automatic episode prefix in a single-episode detail', () => {
+    const markup = renderToStaticMarkup(
+      <DetailPanel
+        item={{ ...video, episode: '#01', episodeTitle: 'Bangumi 原标题', bangumiEpisodeSort: 1 }}
+        includeEpisodePrefix={false}
+        availableTags={[]}
+        onUpdateTags={noOp}
+        onUpdateBookMetadata={async () => {}}
+        onUpdateVideoEpisode={async () => video}
+        onUpdateVideoReleaseDate={async () => video}
+        onApplyBangumiEpisode={async () => video}
+        onOpenExternalUrl={noOp}
+        onClose={noOp}
+        onRead={noOp}
+        onPlayVideo={noOp}
+        onOpenExternal={noOp}
+      />,
+    )
+
+    expect(markup).toContain('Bangumi 原标题')
+    expect(markup).not.toContain('#01 Bangumi 原标题')
+  })
+
+  it('hides Bangumi renaming after the sanitized filename has been saved', () => {
+    const markup = renderToStaticMarkup(
+      <DetailPanel
+        item={{ ...video, episode: '#04 Question？', episodeTitle: '#04 Question?', bangumiEpisodeSort: 4 }}
+        availableTags={[]}
+        onUpdateTags={noOp}
+        onUpdateBookMetadata={async () => {}}
+        onUpdateVideoEpisode={async () => video}
+        onUpdateVideoReleaseDate={async () => video}
+        onApplyBangumiEpisode={async () => video}
+        onOpenExternalUrl={noOp}
+        onClose={noOp}
+        onRead={noOp}
+        onPlayVideo={noOp}
+        onOpenExternal={noOp}
+      />,
+    )
+
+    expect(markup).not.toContain('使用 Bangumi 标题重命名')
+  })
+
+  it('keeps Bangumi numbering after the Bangumi title was used as the local filename', () => {
+    const markup = renderToStaticMarkup(
+      <DetailPanel
+        item={{
+          ...video,
+          episode: '二つのキャンプ、二人の景色',
+          episodeTitle: '二つのキャンプ、二人の景色',
+          episodeTitleSource: 'bangumi',
+          bangumiEpisodeSort: 5,
+        }}
+        availableTags={[]}
+        onUpdateTags={noOp}
+        onUpdateBookMetadata={async () => {}}
+        onUpdateVideoEpisode={async () => video}
+        onUpdateVideoReleaseDate={async () => video}
+        onApplyBangumiEpisode={async () => video}
+        onOpenExternalUrl={noOp}
+        onClose={noOp}
+        onRead={noOp}
+        onPlayVideo={noOp}
+        onOpenExternal={noOp}
+      />,
+    )
+
+    expect(markup).toContain('#05 二つのキャンプ、二人の景色')
   })
 
   it('keeps media library navigation in the configured order', () => {
@@ -273,8 +346,30 @@ describe('renderer component smoke coverage', () => {
     )
 
     expect(markup).toContain('collection-action-toggle')
-    expect(markup).toContain('内嵌字幕')
+    expect(markup).toContain('内嵌字幕标记')
     expect(markup).not.toContain('collection-embedded-subtitle-toggle')
+  })
+
+  it('defaults collection entries to name ordering without an episode sort option', () => {
+    const markup = renderToStaticMarkup(
+      <ContainerOverview
+        kind="affiliation"
+        name="Series"
+        items={[
+          { ...video, id: 'four', episode: '#04 特典', bangumiEpisodeSort: 2 },
+          { ...video, id: 'two', episode: '#02 正篇', bangumiEpisodeSort: 4 },
+        ]}
+        availableTags={[]}
+        onBack={noOp}
+        onOpen={noOp}
+        onSaveNote={noOp}
+        onSaveTags={noOp}
+      />,
+    )
+
+    expect(markup).toContain('名称 A-Z')
+    expect(markup).not.toContain('集数排序')
+    expect(markup.indexOf('#02 正篇')).toBeLessThan(markup.indexOf('#04 特典'))
   })
 
   it('does not offer media-library transfer for a single video selection', () => {

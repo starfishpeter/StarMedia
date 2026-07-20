@@ -1,8 +1,9 @@
 import { ExternalLink, Maximize2, Pause, Play, Volume2, VolumeX } from 'lucide-react'
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from 'react'
+import { useCallback, useEffect, useEffectEvent, useRef, useState, type MouseEvent } from 'react'
 import type { MediaItem } from '../data'
 
 export type VideoPlayerStatus = 'idle' | 'loading' | 'ready' | 'error'
+type VideoFitMode = 'contain' | 'theater'
 type SubtitleTrack = { format: 'ass' | 'vtt'; url: string; label: string }
 
 type AssRenderer = { dispose: () => void }
@@ -37,7 +38,12 @@ function loadAssFonts() {
         return response.json()
       })
       .then((files: unknown) => {
-        if (!Array.isArray(files) || files.length !== 1 || files.some((file) => typeof file !== 'string' || !file.endsWith('.otf')))
+        if (
+          !Array.isArray(files) ||
+          files.length !== 2 ||
+          !files.includes('NotoSansCJKsc-Regular.otf') ||
+          !files.includes('NotoSansCJKsc-Bold.otf')
+        )
           throw new Error('内置中文字幕字体清单无效。')
         return files.map((file) => getLibassAssetUrl(`fonts/${file}`))
       })
@@ -74,6 +80,7 @@ export function VideoPlayer({
   subtitles,
   status,
   errorMessage,
+  defaultFitMode,
   onClose,
   onOpenExternal,
   onMetadata,
@@ -85,6 +92,7 @@ export function VideoPlayer({
   subtitles: SubtitleTrack[]
   status: VideoPlayerStatus
   errorMessage: string
+  defaultFitMode: VideoFitMode
   onClose: () => void
   onOpenExternal: (item: MediaItem) => Promise<void>
   onMetadata: (item: MediaItem, durationSeconds: number, thumbnailDataUrl?: string) => void
@@ -97,10 +105,11 @@ export function VideoPlayer({
   const longPressTimerRef = useRef<number | null>(null)
   const longPressActiveRef = useRef(false)
   const longPressPointerIdRef = useRef<number | null>(null)
+  const longPressTargetRef = useRef<HTMLElement | null>(null)
   const suppressVideoClickRef = useRef(false)
   const selectedRateRef = useRef(1)
   const [playbackError, setPlaybackError] = useState(false)
-  const [fitMode, setFitMode] = useState<'contain' | 'theater'>('contain')
+  const [fitMode, setFitMode] = useState<VideoFitMode>(defaultFitMode)
   const [playbackRate, setPlaybackRate] = useState(1)
   const [selectedSubtitle, setSelectedSubtitle] = useState('off')
   const [isPlaying, setIsPlaying] = useState(false)
@@ -121,6 +130,7 @@ export function VideoPlayer({
     setIsPlaying(false)
     setDuration(0)
     setCurrentTime(0)
+    setFitMode(defaultFitMode)
   })
 
   useEffect(() => {
@@ -132,8 +142,8 @@ export function VideoPlayer({
       if (longPressTimerRef.current !== null) window.clearTimeout(longPressTimerRef.current)
       if (controlsTimerRef.current !== null) window.clearTimeout(controlsTimerRef.current)
       const pointerId = longPressPointerIdRef.current
-      const video = videoRef.current
-      if (pointerId !== null && video?.hasPointerCapture?.(pointerId)) video.releasePointerCapture(pointerId)
+      const target = longPressTargetRef.current
+      if (pointerId !== null && target?.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId)
     },
     [],
   )
@@ -263,6 +273,15 @@ export function VideoPlayer({
     else video.pause()
   }
 
+  function handleTheaterBackdropClick(event: MouseEvent<HTMLElement>) {
+    if (fitMode !== 'theater' || status !== 'ready') return
+    const target = event.target
+    if (target instanceof Element && target.closest('.video-canvas')) return
+    if (suppressVideoClickRef.current) return
+    revealControls()
+    togglePlayback()
+  }
+
   function seekTo(seconds: number) {
     const video = videoRef.current
     if (!video || !Number.isFinite(seconds)) return
@@ -288,11 +307,12 @@ export function VideoPlayer({
     setMuted(nextMuted)
   }
 
-  function startLongPressSpeed(event: React.PointerEvent<HTMLVideoElement>) {
+  function startLongPressSpeed(event: React.PointerEvent<HTMLElement>) {
     if (event.button !== 0) return
     if (longPressTimerRef.current !== null) window.clearTimeout(longPressTimerRef.current)
     event.currentTarget.setPointerCapture?.(event.pointerId)
     longPressPointerIdRef.current = event.pointerId
+    longPressTargetRef.current = event.currentTarget
     longPressActiveRef.current = false
     longPressTimerRef.current = window.setTimeout(() => {
       longPressActiveRef.current = true
@@ -301,7 +321,7 @@ export function VideoPlayer({
     }, 350)
   }
 
-  function stopLongPressSpeed(event?: React.PointerEvent<HTMLVideoElement>) {
+  function stopLongPressSpeed(event?: React.PointerEvent<HTMLElement>) {
     if (longPressTimerRef.current !== null) {
       window.clearTimeout(longPressTimerRef.current)
       longPressTimerRef.current = null
@@ -311,13 +331,26 @@ export function VideoPlayer({
       applyPlaybackRate(selectedRateRef.current, false)
     }
     const pointerId = event?.pointerId ?? longPressPointerIdRef.current
-    const video = event?.currentTarget ?? videoRef.current
-    if (pointerId !== null && video?.hasPointerCapture?.(pointerId)) video.releasePointerCapture(pointerId)
+    const target = event?.currentTarget ?? longPressTargetRef.current
+    if (pointerId !== null && target?.hasPointerCapture?.(pointerId)) target.releasePointerCapture(pointerId)
     longPressPointerIdRef.current = null
+    longPressTargetRef.current = null
     if (suppressVideoClickRef.current)
       window.setTimeout(() => {
         suppressVideoClickRef.current = false
       }, 0)
+  }
+
+  function isTheaterBackdrop(target: EventTarget | null) {
+    return fitMode === 'theater' && status === 'ready' && !(target instanceof Element && target.closest('.video-canvas'))
+  }
+
+  function startTheaterBackdropLongPress(event: React.PointerEvent<HTMLElement>) {
+    if (isTheaterBackdrop(event.target)) startLongPressSpeed(event)
+  }
+
+  function stopTheaterBackdropLongPress(event: React.PointerEvent<HTMLElement>) {
+    if (longPressTargetRef.current === event.currentTarget) stopLongPressSpeed(event)
   }
 
   const cancelLongPress = useEffectEvent(() => stopLongPressSpeed())
@@ -401,7 +434,14 @@ export function VideoPlayer({
           </button>
         </div>
       </header>
-      <main className="video-stage">
+      <main
+        className="video-stage"
+        onClick={handleTheaterBackdropClick}
+        onPointerDown={startTheaterBackdropLongPress}
+        onPointerUp={stopTheaterBackdropLongPress}
+        onPointerCancel={stopTheaterBackdropLongPress}
+        onLostPointerCapture={stopTheaterBackdropLongPress}
+      >
         {status === 'loading' && <div className="reader-state">正在打开视频…</div>}
         {status === 'error' && (
           <div className="reader-state">

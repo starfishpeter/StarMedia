@@ -231,6 +231,8 @@ function createLibraryMetadataService({
 
   async function updateVideoEpisode(input) {
     const episode = normalizeFolderName(input.episode.trim(), '', '视频名称')
+    const episodeTitle = typeof input.episodeTitle === 'string' ? input.episodeTitle.trim().slice(0, 200) : episode
+    const episodeTitleSource = input.episodeTitleSource === 'bangumi' ? 'bangumi' : 'manual'
     const [config, library] = await Promise.all([loadConfig(), loadLibrary()])
     const selected = library.items.find((item) => item?.id === input.id)
     if (!selected || selected.kind !== 'video' || typeof selected.sourcePath !== 'string') throw new Error('视频记录不存在')
@@ -294,6 +296,8 @@ function createLibraryMetadataService({
               ...item,
               title: episode,
               episode,
+              episodeTitle,
+              episodeTitleSource,
               sourcePath: mediaMove.targetPath,
               relativePath: path.relative(managedRoot, mediaMove.targetPath),
               sidecars,

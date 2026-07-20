@@ -1,7 +1,7 @@
 import { ChevronLeft, ExternalLink, Trash2, UploadCloud } from 'lucide-react'
 import { useEffect, useEffectEvent, useRef, useState, type CSSProperties, type FormEvent, type MouseEvent, type PointerEvent } from 'react'
 import type { MediaItem } from '../data'
-import { compareMediaEpisodes, getEpisodeCover, getMediaEpisode } from '../domain/media'
+import { compareMediaNames, getEpisodeCover, getMediaEpisode } from '../domain/media'
 import { createAllScrapeFields } from '../domain/scrape'
 import { MediaWall } from './MediaWall'
 import { TagEditor } from './TagEditor'
@@ -15,7 +15,7 @@ export type ContainerMetadata = {
 type ScrapeDraftValues = Required<StarMediaScrapeFields>
 type ScrapeWritableField = Exclude<keyof ScrapeDraftValues, 'releaseDate'>
 type ScrapeApplyTarget = ScrapeWritableField | 'all'
-type EpisodeSortMode = 'episode' | 'title-asc' | 'title-desc'
+type EpisodeSortMode = 'title-asc' | 'title-desc'
 type ScraperSource = 'bangumi' | 'freeanimehentai' | 'hanime1'
 
 const emptyScrapeDraftValues: ScrapeDraftValues = {
@@ -88,19 +88,17 @@ export function ContainerOverview({
   onOpenBatchMenu?: (item: MediaItem, event: MouseEvent<HTMLElement>) => void
   onSelectMany?: (items: MediaItem[]) => void
 }) {
-  const [episodeSort, setEpisodeSort] = useState<EpisodeSortMode>('episode')
+  const [episodeSort, setEpisodeSort] = useState<EpisodeSortMode>('title-asc')
   const representative = items[0]
+  const includeEpisodePrefix = items.length > 1
+  const compareByEpisodeName = (left: MediaItem, right: MediaItem) =>
+    compareMediaNames(getMediaEpisode(left, includeEpisodePrefix), getMediaEpisode(right, includeEpisodePrefix))
   const orderedItems = [...items].sort(
     kind === 'affiliation'
-      ? episodeSort === 'episode'
-        ? compareMediaEpisodes
-        : (left, right) => {
-            const result = getMediaEpisode(left).localeCompare(getMediaEpisode(right), 'zh-CN', { numeric: true })
-            return episodeSort === 'title-asc' ? result : -result
-          }
-      : (left, right) => left.title.localeCompare(right.title, 'zh-CN', { numeric: true }),
+      ? (left, right) => (episodeSort === 'title-asc' ? compareByEpisodeName(left, right) : compareByEpisodeName(right, left))
+      : (left, right) => compareMediaNames(left.title, right.title),
   )
-  const coverItem = kind === 'affiliation' ? [...items].sort(compareMediaEpisodes)[0] : orderedItems[0]
+  const coverItem = kind === 'affiliation' ? [...items].sort(compareByEpisodeName)[0] : orderedItems[0]
   const [draftNote, setDraftNote] = useState(representative?.note ?? '')
   const [draftMetadata, setDraftMetadata] = useState<ContainerMetadata>({
     name,
@@ -110,15 +108,9 @@ export function ContainerOverview({
   })
   const [scraperSource, setScraperSource] = useState<ScraperSource>('bangumi')
   const [scraperQuery, setScraperQuery] = useState(representative?.originalTitle?.trim() || name)
-  const [bangumiId, setBangumiId] = useState(
-    representative?.bangumiId ?? (representative?.scraperSource === 'Bangumi' ? (representative.scraperId ?? '') : ''),
-  )
-  const [freeAnimeHentaiId, setFreeAnimeHentaiId] = useState(
-    representative?.freeAnimeHentaiId ?? (representative?.scraperSource === 'FreeAnimeHentai' ? (representative.scraperId ?? '') : ''),
-  )
-  const [hanime1Id, setHanime1Id] = useState(
-    representative?.hanime1Id ?? (representative?.scraperSource === 'Hanime1' ? (representative.scraperId ?? '') : ''),
-  )
+  const [bangumiId, setBangumiId] = useState(representative?.bangumiId ?? '')
+  const [freeAnimeHentaiId, setFreeAnimeHentaiId] = useState(representative?.freeAnimeHentaiId ?? '')
+  const [hanime1Id, setHanime1Id] = useState(representative?.hanime1Id ?? '')
   const [bangumiSubjects, setBangumiSubjects] = useState<StarMediaBangumiSubject[]>([])
   const [hanimeSubjects, setHanimeSubjects] = useState<StarMediaHanimeSubject[]>([])
   const [scrapePreview, setScrapePreview] = useState<StarMediaScrapePreview | null>(null)
@@ -157,11 +149,9 @@ export function ContainerOverview({
   )
   const resetContainerState = useEffectEvent(() => {
     setScraperQuery(representative?.originalTitle?.trim() || name)
-    setBangumiId(representative?.bangumiId ?? (representative?.scraperSource === 'Bangumi' ? (representative.scraperId ?? '') : ''))
-    setFreeAnimeHentaiId(
-      representative?.freeAnimeHentaiId ?? (representative?.scraperSource === 'FreeAnimeHentai' ? (representative.scraperId ?? '') : ''),
-    )
-    setHanime1Id(representative?.hanime1Id ?? (representative?.scraperSource === 'Hanime1' ? (representative.scraperId ?? '') : ''))
+    setBangumiId(representative?.bangumiId ?? '')
+    setFreeAnimeHentaiId(representative?.freeAnimeHentaiId ?? '')
+    setHanime1Id(representative?.hanime1Id ?? '')
     setBangumiSubjects([])
     setHanimeSubjects([])
     setScrapePreview(null)
@@ -272,6 +262,7 @@ export function ContainerOverview({
       if (scrapePreview.source === 'bangumi' && onApplyBangumi) {
         await onApplyBangumi(representative, scrapePreview.subjectId, fields)
         setBangumiId(String(scrapePreview.subjectId))
+        if (scrapePreview.title.trim()) setScraperQuery(scrapePreview.title.trim())
       } else if ((scrapePreview.source === 'freeanimehentai' || scrapePreview.source === 'hanime1') && onApplyHanime) {
         await onApplyHanime(representative, scrapePreview.subjectId, scrapePreview.source, fields)
         if (scrapePreview.source === 'hanime1') setHanime1Id(String(scrapePreview.subjectId))
@@ -462,8 +453,8 @@ export function ContainerOverview({
                 </button>
               )}
               {kind === 'affiliation' && onUpdateEmbeddedSubtitles && (
-                <label className="toolbar-toggle collection-action-toggle" aria-label="是否内嵌字幕">
-                  <span className="toolbar-toggle-label">内嵌字幕</span>
+                <label className="toolbar-toggle collection-action-toggle" aria-label="内嵌字幕标记">
+                  <span className="toolbar-toggle-label">内嵌字幕标记</span>
                   <span className="toolbar-toggle-state">{embeddedSubtitleSaving ? '保存中' : hasEmbeddedSubtitles ? '开' : '关'}</span>
                   <input
                     type="checkbox"
@@ -908,7 +899,6 @@ export function ContainerOverview({
               <label className="episode-sort-select">
                 <span>排序</span>
                 <select value={episodeSort} onChange={(event) => setEpisodeSort(event.target.value as EpisodeSortMode)}>
-                  <option value="episode">集数排序</option>
                   <option value="title-asc">名称 A-Z</option>
                   <option value="title-desc">名称 Z-A</option>
                 </select>
@@ -919,6 +909,7 @@ export function ContainerOverview({
         {kind === 'affiliation' ? (
           <EpisodeSelectionSurface
             items={orderedItems}
+            includeEpisodePrefix={includeEpisodePrefix}
             selectedIds={selectedIds}
             onOpen={onOpen}
             onToggleSelection={onToggleSelection}
@@ -983,6 +974,7 @@ function ScrapeValueRow({
 
 function EpisodeSelectionSurface({
   items,
+  includeEpisodePrefix,
   selectedIds,
   onOpen,
   onToggleSelection,
@@ -990,6 +982,7 @@ function EpisodeSelectionSurface({
   onSelectMany,
 }: {
   items: MediaItem[]
+  includeEpisodePrefix: boolean
   selectedIds: string[]
   onOpen: (item: MediaItem) => void
   onToggleSelection?: (item: MediaItem) => void
@@ -1137,7 +1130,7 @@ function EpisodeSelectionSurface({
             }}
           >
             <div className="episode-cover" style={{ background: getEpisodeCover(item) } as CSSProperties} />
-            <strong>{getMediaEpisode(item)}</strong>
+            <strong>{getMediaEpisode(item, includeEpisodePrefix)}</strong>
           </button>
         </div>
       ))}

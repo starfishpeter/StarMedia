@@ -9,6 +9,8 @@ const config: StarMediaConfig = {
   theme: 'dark',
   cacheLimitMb: 4096,
   confirmBeforeClose: true,
+  defaultPlaybackMode: 'contain',
+  defaultReadingMode: 'page',
   showExternalSubtitleBadges: false,
   network: { proxyEnabled: false, proxyUrl: '' },
   scraping: { bangumiToken: '', bangumiEndpoint: 'https://api.bgm.tv', hanime1Endpoint: 'https://hanime1.com' },
@@ -76,6 +78,9 @@ describe('SettingsView', () => {
     expect(markup).toContain('选择本地升级包')
     expect(markup).toContain('路径配置')
     expect(markup).toContain('网络代理')
+    expect(markup).toContain('默认播放模式')
+    expect(markup).toContain('默认阅读模式')
+    expect(markup).toContain('适应窗口')
   })
 
   it('keeps application-data import enabled when unrelated maintenance APIs are unavailable', () => {

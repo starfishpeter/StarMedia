@@ -142,6 +142,8 @@ function parseConfig(value) {
     'theme',
     'cacheLimitMb',
     'confirmBeforeClose',
+    'defaultPlaybackMode',
+    'defaultReadingMode',
     'showExternalSubtitleBadges',
     'network',
     'scraping',
@@ -153,6 +155,8 @@ function parseConfig(value) {
   if (!['dark', 'light', 'blue'].includes(config.theme)) fail('主题无效')
   if (!Number.isFinite(config.cacheLimitMb) || config.cacheLimitMb < 128 || config.cacheLimitMb > 8192) fail('缓存上限无效')
   if (typeof config.confirmBeforeClose !== 'boolean') fail('关闭确认设置无效')
+  if (!['contain', 'theater'].includes(config.defaultPlaybackMode)) fail('默认播放模式无效')
+  if (!['page', 'scroll'].includes(config.defaultReadingMode)) fail('默认阅读模式无效')
   if (typeof config.showExternalSubtitleBadges !== 'boolean') fail('外挂字幕角标设置无效')
 
   const network = object(config.network, '网络配置', ['proxyEnabled', 'proxyUrl'])
@@ -401,8 +405,15 @@ const IPC_CONTRACTS = Object.freeze({
     response: 'StarMediaLibraryResult & { item: MediaItem }',
     parse: (args) =>
       oneArgument(args, (value) => {
-        const input = object(value, '选集资料', ['id', 'episode'])
-        return { id: id(input.id, '媒体 ID'), episode: string(input.episode, '选集名称', { min: 1, max: 200, trim: true }) }
+        const input = object(value, '选集资料', ['id', 'episode', 'episodeTitle', 'episodeTitleSource'])
+        const result = { id: id(input.id, '媒体 ID'), episode: string(input.episode, '选集名称', { min: 1, max: 200, trim: true }) }
+        if (input.episodeTitle !== undefined)
+          result.episodeTitle = string(input.episodeTitle, '单集显示标题', { min: 1, max: 200, trim: true })
+        if (input.episodeTitleSource !== undefined) {
+          if (!['bangumi', 'manual'].includes(input.episodeTitleSource)) fail('单集显示标题来源无效')
+          result.episodeTitleSource = input.episodeTitleSource
+        }
+        return result
       }),
   },
   'library:updateBookShelves': {

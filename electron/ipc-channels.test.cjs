@@ -87,6 +87,14 @@ test('IPC request contracts reject malformed, oversized, and ambiguous input', (
     /内嵌字幕状态无效/,
   )
   assert.throws(
+    () => parseIpcRequest(IPC_CHANNELS.libraryUpdateVideoEpisode, [{ id: 'video:1', episode: '#01', episodeTitle: '' }]),
+    /单集显示标题不能为空/,
+  )
+  assert.throws(
+    () => parseIpcRequest(IPC_CHANNELS.libraryUpdateVideoEpisode, [{ id: 'video:1', episode: '#01', episodeTitleSource: 'unknown' }]),
+    /单集显示标题来源无效/,
+  )
+  assert.throws(
     () =>
       parseIpcRequest(IPC_CHANNELS.configSave, [
         {
@@ -96,6 +104,8 @@ test('IPC request contracts reject malformed, oversized, and ambiguous input', (
           theme: 'dark',
           cacheLimitMb: 4096,
           confirmBeforeClose: true,
+          defaultPlaybackMode: 'contain',
+          defaultReadingMode: 'page',
           showExternalSubtitleBadges: 'yes',
           network: { proxyEnabled: false, proxyUrl: '' },
           scraping: { bangumiToken: '', bangumiEndpoint: 'https://api.bgm.tv', hanime1Endpoint: 'https://hanime1.com' },

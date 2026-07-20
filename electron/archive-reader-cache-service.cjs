@@ -347,10 +347,7 @@ function createArchiveReaderCacheService({
       })
     if (validCover) return pathToFileURL(coverPath).toString()
 
-    const legacyName = (await fileSystem.readdir(coverDir)).find((name) => name.startsWith(`${key}.`) && !name.endsWith('-thumb-v2.jpg'))
-    if (!legacyName) return ''
-    await createCoverThumbnail(path.join(coverDir, legacyName), coverPath)
-    return pathToFileURL(coverPath).toString()
+    return ''
   }
 
   async function openArchive(filePath) {
