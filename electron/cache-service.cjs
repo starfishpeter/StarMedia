@@ -1,6 +1,63 @@
 const fs = require('node:fs/promises')
 const path = require('node:path')
 
+async function mapWithConcurrency(values, worker, concurrency = 8) {
+  const list = Array.isArray(values) ? values : []
+  if (list.length === 0) return []
+  const results = new Array(list.length)
+  let nextIndex = 0
+  const workerCount = Math.min(Math.max(1, Number(concurrency) || 8), list.length)
+  async function runWorker() {
+    while (true) {
+      const index = nextIndex
+      nextIndex += 1
+      if (index >= list.length) return
+      results[index] = await worker(list[index], index)
+    }
+  }
+  await Promise.all(Array.from({ length: workerCount }, runWorker))
+  return results
+}
+
+function createLimiter(limit) {
+  const max = Math.max(1, Number(limit) || 8)
+  let active = 0
+  const waiting = []
+  return async function run(task) {
+    if (active >= max) await new Promise((resolve) => waiting.push(resolve))
+    active += 1
+    try {
+      return await task()
+    } finally {
+      active -= 1
+      const next = waiting.shift()
+      if (next) next()
+    }
+  }
+}
+
+async function measureDirectoryBytes(directoryPath, fileSystem = fs, concurrency = 8) {
+  const root = String(directoryPath ?? '').trim()
+  if (!path.isAbsolute(root)) return 0
+  const limit = createLimiter(concurrency)
+  let total = 0
+
+  async function visit(entryPath) {
+    const stat = await fileSystem.lstat(entryPath).catch(() => null)
+    if (!stat || stat.isSymbolicLink()) return
+    if (stat.isFile()) {
+      total += stat.size
+      return
+    }
+    if (!stat.isDirectory()) return
+    const entries = await fileSystem.readdir(entryPath).catch(() => [])
+    await Promise.all(entries.map((entry) => limit(() => visit(path.join(entryPath, entry)))))
+  }
+
+  await visit(root)
+  return total
+}
+
 async function collectFiles(directory) {
   const files = []
 
@@ -83,6 +140,8 @@ async function clearCacheDirectory(cacheDir) {
 module.exports = {
   clearCacheDirectory,
   collectFiles,
+  mapWithConcurrency,
+  measureDirectoryBytes,
   pruneCacheDirectory,
   touchCacheFile,
 }

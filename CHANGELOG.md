@@ -4,6 +4,20 @@
 
 仅保留当前版本系列的更新记录，避免日志无限增长。当前保留 `0.7.x`；升级到下一个版本系列时，应移除本系列记录并从新系列开始。完整历史可通过 [GitHub Releases](https://github.com/starfishpeter/StarMedia/releases) 和 Git 提交记录查询。
 
+## [0.7.9] - 2026-10-21
+
+### 改进
+
+- Bangumi 访问令牌改为向官方 `token_status` 接口验证，支持个人访问令牌，并正确读取过期时间。
+- 刷新媒体库时并行检查文件是否仍在，并按目录索引外挂字幕，缩短大型库的加载时间。
+- 磁盘占用改为有限并发扫描，且仅在媒体数量、体积或字幕变化时重算，不再被缩略图更新打断。
+- 超过 60 项的大图媒体墙统一虚拟化；搜索文本预先建索引，合集墙和书架墙的分组结果会复用。
+- 绿色包装改用 7-Zip 压缩，避免 Windows `Compress-Archive` 锁定运行时文件导致打包失败。
+
+### 清理
+
+- 移除未使用的 `electron-builder`、空 README、过期 UI 样式和无效导出。
+
 ## [0.7.8] - 2026-07-20
 
 ### 改进
@@ -112,3 +126,4 @@
 [0.7.5]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.5
 [0.7.6]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.6
 [0.7.8]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.8
+[0.7.9]: https://github.com/starfishpeter/StarMedia/releases/tag/v0.7.9

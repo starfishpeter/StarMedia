@@ -266,42 +266,53 @@ export function AffiliationWall({
   onOpenBatchMenu?: (items: MediaItem[], event: React.MouseEvent<HTMLElement>) => void
   onSelectMany?: (items: MediaItem[]) => void
 }) {
-  const groups = new Map<string, MediaItem[]>()
-  for (const item of items) {
-    const affiliation = getMediaAffiliation(item)
-    const group = groups.get(affiliation) ?? []
-    group.push(item)
-    groups.set(affiliation, group)
-  }
-  const selectedIdSet = new Set(selectedIds)
-  const entries = [...groups.entries()]
-    .map(
-      ([name, groupItems]) =>
-        [
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
+  const entries = useMemo(() => {
+    const groups = new Map<string, MediaItem[]>()
+    for (const item of items) {
+      const affiliation = getMediaAffiliation(item)
+      const group = groups.get(affiliation) ?? []
+      group.push(item)
+      groups.set(affiliation, group)
+    }
+    return [...groups.entries()]
+      .map(([name, groupItems]) => {
+        const representative = groupItems.reduce((best, item) => (compareMediaItems(item, best, sortMode, sortDirection) < 0 ? item : best))
+        const coverItem = [...groupItems].sort((left, right) => compareMediaNames(getMediaEpisode(left), getMediaEpisode(right)))[0]
+        return {
           name,
           groupItems,
-          groupItems.reduce((best, item) => (compareMediaItems(item, best, sortMode, sortDirection) < 0 ? item : best)),
-        ] as const,
-    )
-    .sort(([leftName, , left], [rightName, , right]) => {
-      if (sortMode === 'title') {
-        const result = compareMediaNames(leftName, rightName)
-        return sortDirection === 'ascending' ? result : -result
-      }
-      return compareMediaItems(left, right, sortMode, sortDirection) || compareMediaNames(leftName, rightName)
-    })
-  const usesPosterCards = entries[0]?.[1][0]?.library === 'erAnime' || entries[0]?.[1][0]?.library === 'anime'
+          representative,
+          coverItem,
+          hasExternalSubtitle: groupItems.some(hasExternalSubtitle),
+          hasEmbeddedSubtitle: groupItems.some(hasEmbeddedSubtitle),
+        }
+      })
+      .sort((left, right) => {
+        if (sortMode === 'title') {
+          const result = compareMediaNames(left.name, right.name)
+          return sortDirection === 'ascending' ? result : -result
+        }
+        return (
+          compareMediaItems(left.representative, right.representative, sortMode, sortDirection) || compareMediaNames(left.name, right.name)
+        )
+      })
+  }, [items, sortDirection, sortMode])
+  const groups = useMemo(() => entries.map((entry) => ({ key: entry.name, items: entry.groupItems })), [entries])
+  const entryByName = useMemo(() => new Map(entries.map((entry) => [entry.name, entry])), [entries])
+  const usesPosterCards = entries[0]?.groupItems[0]?.library === 'erAnime' || entries[0]?.groupItems[0]?.library === 'anime'
   return (
     <GroupSelectionSurface
       className={`affiliation-wall ${usesPosterCards ? 'poster-affiliation-wall' : 'landscape-affiliation-wall'}`}
-      groups={entries.map(([key, groupItems]) => ({ key, items: groupItems }))}
+      groups={groups}
       selectedIds={selectedIds}
       onSelectMany={onSelectMany}
     >
       {(group, { selectRange }) => {
         const affiliation = group.key
-        const episodes = group.items
-        const coverItem = [...episodes].sort((left, right) => compareMediaNames(getMediaEpisode(left), getMediaEpisode(right)))[0]
+        const entry = entryByName.get(affiliation)
+        if (!entry) return null
+        const { groupItems: episodes, coverItem, hasExternalSubtitle: showExternal, hasEmbeddedSubtitle: showEmbedded } = entry
         return (
           <button
             data-group-key={affiliation}
@@ -322,10 +333,10 @@ export function AffiliationWall({
               style={{ background: coverItem.cover } as CSSProperties}
             >
               <span className="cover-grain" />
-              {showExternalSubtitleBadges && (episodes.some(hasExternalSubtitle) || episodes.some(hasEmbeddedSubtitle)) && (
+              {showExternalSubtitleBadges && (showExternal || showEmbedded) && (
                 <span className="subtitle-badges">
-                  {episodes.some(hasExternalSubtitle) && <span className="external-subtitle-badge">外挂字幕</span>}
-                  {episodes.some(hasEmbeddedSubtitle) && <span className="embedded-subtitle-badge">内嵌字幕</span>}
+                  {showExternal && <span className="external-subtitle-badge">外挂字幕</span>}
+                  {showEmbedded && <span className="embedded-subtitle-badge">内嵌字幕</span>}
                 </span>
               )}
             </div>
@@ -451,37 +462,37 @@ export function BookshelfWall({
   onSelectMany: (items: MediaItem[]) => void
   onOpenBatchMenu: (items: MediaItem[], event: React.MouseEvent<HTMLElement>) => void
 }) {
-  const shelves = [
-    ...items
-      .reduce((result, item) => {
-        const name = item.shelf?.trim() || ''
-        const grouped = result.get(name) ?? []
-        grouped.push(item)
-        result.set(name, grouped)
-        return result
-      }, new Map<string, MediaItem[]>())
-      .entries(),
-  ]
-    .map(
-      ([name, groupItems]) =>
-        [
-          name,
-          groupItems,
-          groupItems.reduce((best, item) => (compareMediaItems(item, best, sortMode, sortDirection) < 0 ? item : best)),
-        ] as const,
-    )
-    .sort(([leftName, , left], [rightName, , right]) => {
-      return compareMediaItems(left, right, sortMode, sortDirection) || compareMediaNames(leftName, rightName)
-    })
-  const selectedIdSet = new Set(selectedIds)
+  const shelves = useMemo(
+    () =>
+      [
+        ...items
+          .reduce((result, item) => {
+            const name = item.shelf?.trim() || ''
+            const grouped = result.get(name) ?? []
+            grouped.push(item)
+            result.set(name, grouped)
+            return result
+          }, new Map<string, MediaItem[]>())
+          .entries(),
+      ]
+        .map(
+          ([name, groupItems]) =>
+            [
+              name,
+              groupItems,
+              groupItems.reduce((best, item) => (compareMediaItems(item, best, sortMode, sortDirection) < 0 ? item : best)),
+            ] as const,
+        )
+        .sort(([leftName, , left], [rightName, , right]) => {
+          return compareMediaItems(left, right, sortMode, sortDirection) || compareMediaNames(leftName, rightName)
+        }),
+    [items, sortDirection, sortMode],
+  )
+  const groups = useMemo(() => shelves.map(([key, groupItems]) => ({ key, items: groupItems })), [shelves])
+  const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
 
   return (
-    <GroupSelectionSurface
-      className="bookshelf-wall"
-      groups={shelves.map(([key, groupItems]) => ({ key, items: groupItems }))}
-      selectedIds={selectedIds}
-      onSelectMany={onSelectMany}
-    >
+    <GroupSelectionSurface className="bookshelf-wall" groups={groups} selectedIds={selectedIds} onSelectMany={onSelectMany}>
       {(group, { selectRange }) => {
         const shelf = group.key
         const books = group.items

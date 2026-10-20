@@ -140,8 +140,4 @@ function createGitHubUpdateService({
 
 module.exports = {
   createGitHubUpdateService,
-  isExpectedDownloadUrl,
-  latestReleaseEndpoint,
-  parseReleaseVersion,
-  parseSha256Digest,
 }

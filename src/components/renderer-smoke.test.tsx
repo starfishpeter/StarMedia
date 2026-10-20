@@ -465,15 +465,13 @@ describe('renderer component smoke coverage', () => {
     expect(generalDetail).not.toContain('标签（作用于整个合集）')
   })
 
-  it('caps the initial archive media wall DOM for large libraries', () => {
+  it('caps the initial media wall DOM for large libraries', () => {
     const books = Array.from({ length: 209 }, (_, index) => ({
       ...book,
       id: `book:${index + 1}`,
       title: `Book ${index + 1}`,
     }))
-    const markup = renderToStaticMarkup(
-      <MediaWall items={books} viewMode="large" deferRendering onOpen={noOp} selectedIds={[]} onSelectMany={noOp} />,
-    )
+    const markup = renderToStaticMarkup(<MediaWall items={books} viewMode="large" onOpen={noOp} selectedIds={[]} onSelectMany={noOp} />)
 
     expect(markup.match(/data-media-id=/g)).toHaveLength(48)
     expect(markup).not.toContain('content-visibility')

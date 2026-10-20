@@ -1,7 +1,7 @@
 {
   "name": "starmedia",
   "private": true,
-  "version": "0.7.8",
+  "version": "0.7.9",
   "description": "A local-first Windows media library prototype.",
   "main": "electron/main.cjs",
   "scripts": {
@@ -39,7 +39,7 @@
     "@vitejs/plugin-react": "^5.0.2",
     "concurrently": "^9.2.1",
     "electron": "^43.1.0",
-    "electron-builder": "^26.15.3",
+    "electron-winstaller": "^5.4.0",
     "eslint": "^10.7.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.3",
@@ -50,32 +50,5 @@
     "vite": "^7.1.5",
     "vitest": "^4.1.10",
     "wait-on": "^8.0.4"
-  },
-  "build": {
-    "appId": "com.starmedia.app",
-    "productName": "StarMedia",
-    "asar": false,
-    "directories": {
-      "output": "release"
-    },
-    "files": [
-      "dist/**/*",
-      "electron/**/*",
-      "build/icon.ico",
-      "package.json",
-      "node_modules/**/*"
-    ],
-    "win": {
-      "target": [
-        {
-          "target": "zip",
-          "arch": [
-            "x64"
-          ]
-        }
-      ],
-      "icon": "build/icon.ico"
-    },
-    "artifactName": "StarMedia-${version}-win.${ext}"
   }
 }

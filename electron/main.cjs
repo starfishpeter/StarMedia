@@ -4,7 +4,7 @@ const { randomUUID } = require('node:crypto')
 const os = require('node:os')
 const path = require('node:path')
 const { fileURLToPath, pathToFileURL } = require('node:url')
-const { pruneCacheDirectory, touchCacheFile } = require('./cache-service.cjs')
+const { mapWithConcurrency, measureDirectoryBytes, pruneCacheDirectory, touchCacheFile } = require('./cache-service.cjs')
 const { createDesktopDialogService } = require('./desktop-dialog-service.cjs')
 const { scanImportSources } = require('./import-plan-scan-service.cjs')
 const {
@@ -509,30 +509,61 @@ async function createImportPlan(input) {
   return plan
 }
 
-async function discoverMatchingSidecars(item, directoryEntriesByPath) {
+function sidecarsMatch(left, right) {
+  if (left.length !== right.length) return false
+  return left.every(
+    (sidecar, index) =>
+      sidecar.fileName === right[index].fileName &&
+      sidecar.sourcePath === right[index].sourcePath &&
+      sidecar.extension === right[index].extension &&
+      sidecar.size === right[index].size,
+  )
+}
+
+async function getSidecarDirectoryIndex(directoryPath, directoryIndexes) {
+  let indexTask = directoryIndexes.get(directoryPath)
+  if (!indexTask) {
+    indexTask = (async () => {
+      const entries = await fs.readdir(directoryPath, { withFileTypes: true }).catch(() => [])
+      const byBaseName = new Map()
+      for (const entry of entries) {
+        if (!entry.isFile()) continue
+        const extension = path.extname(entry.name).toLocaleLowerCase()
+        if (!supportedSidecarExtensions.has(extension)) continue
+        const baseName = path.basename(entry.name, extension).toLocaleLowerCase()
+        const matches = byBaseName.get(baseName) ?? []
+        matches.push(entry)
+        byBaseName.set(baseName, matches)
+      }
+      for (const matches of byBaseName.values()) matches.sort((left, right) => left.name.localeCompare(right.name, 'en'))
+      return byBaseName
+    })()
+    directoryIndexes.set(directoryPath, indexTask)
+  }
+  return indexTask
+}
+
+async function discoverMatchingSidecars(item, directoryIndexes) {
   if (item?.kind !== 'video' || typeof item.sourcePath !== 'string' || !path.isAbsolute(item.sourcePath)) return item
   const sourcePath = path.resolve(item.sourcePath)
   const directoryPath = path.dirname(sourcePath)
-  let entryTask = directoryEntriesByPath.get(directoryPath)
-  if (!entryTask) {
-    entryTask = fs.readdir(directoryPath, { withFileTypes: true }).catch(() => [])
-    directoryEntriesByPath.set(directoryPath, entryTask)
-  }
-  const entries = await entryTask
   const sourceBaseName = path.basename(sourcePath, path.extname(sourcePath)).toLocaleLowerCase()
+  const byBaseName = await getSidecarDirectoryIndex(directoryPath, directoryIndexes)
+  const matches = byBaseName.get(sourceBaseName) ?? []
   const discovered = []
-  for (const entry of [...entries].sort((left, right) => left.name.localeCompare(right.name, 'en'))) {
-    if (!entry.isFile()) continue
-    const extension = path.extname(entry.name).toLocaleLowerCase()
-    if (!supportedSidecarExtensions.has(extension)) continue
-    if (path.basename(entry.name, extension).toLocaleLowerCase() !== sourceBaseName) continue
+  for (const entry of matches) {
     const sidecarPath = path.join(directoryPath, entry.name)
     const stat = await fs.stat(sidecarPath).catch(() => null)
     if (!stat?.isFile()) continue
-    discovered.push({ fileName: entry.name, sourcePath: sidecarPath, extension, size: stat.size })
+    discovered.push({
+      fileName: entry.name,
+      sourcePath: sidecarPath,
+      extension: path.extname(entry.name).toLocaleLowerCase(),
+      size: stat.size,
+    })
   }
   const previousSidecars = Array.isArray(item.sidecars) ? item.sidecars : []
-  if (JSON.stringify(previousSidecars) === JSON.stringify(discovered)) return item
+  if (sidecarsMatch(previousSidecars, discovered)) return item
   return { ...item, sidecars: discovered }
 }
 
@@ -554,35 +585,49 @@ async function loadLibrary({ waitForMissingThumbnails = false } = {}) {
       availableLibraryRoots.set(libraryId, false)
     }
   }
-  const missingItemIds = new Set()
-  for (const item of data.items) {
-    const rootPath = config.libraries[item?.library]?.rootPath ?? ''
-    if (!availableLibraryRoots.get(item?.library) || !path.isAbsolute(item?.sourcePath) || !isPathInside(rootPath, item.sourcePath))
-      continue
-    try {
-      if (!(await fs.stat(item.sourcePath)).isFile()) missingItemIds.add(item.id)
-    } catch (error) {
-      if (error?.code === 'ENOENT' || error?.code === 'ENOTDIR') missingItemIds.add(item.id)
-    }
-  }
+  const missingItemIds = new Set(
+    (
+      await mapWithConcurrency(
+        data.items,
+        async (item) => {
+          const rootPath = config.libraries[item?.library]?.rootPath ?? ''
+          if (!availableLibraryRoots.get(item?.library) || !path.isAbsolute(item?.sourcePath) || !isPathInside(rootPath, item.sourcePath))
+            return null
+          try {
+            return (await fs.stat(item.sourcePath)).isFile() ? null : item.id
+          } catch (error) {
+            return error?.code === 'ENOENT' || error?.code === 'ENOTDIR' ? item.id : null
+          }
+        },
+        8,
+      )
+    ).filter(Boolean),
+  )
   const indexedItems = data.items.filter((item) => !missingItemIds.has(item?.id))
   const generatedVideoCoverUrl = pathToFileURL(path.join(coversDir, 'videos')).toString()
+  const directoryIndexes = new Map()
+  const normalizedItems = await mapWithConcurrency(
+    indexedItems,
+    async (item) => {
+      let next = item
+      if (availableLibraryRoots.get(item?.library)) next = await discoverMatchingSidecars(next, directoryIndexes)
+      if (item?.kind === 'book' && item.cover && !getCurrentArchiveCoverPath(item)) next = { ...next, cover: '' }
+      if (
+        item?.kind === 'video' &&
+        isPosterLibrary(item.library) &&
+        typeof item.cover === 'string' &&
+        item.cover.includes(generatedVideoCoverUrl)
+      ) {
+        next = { ...next, cover: '', episodeCover: item.cover }
+      }
+      return next
+    },
+    8,
+  )
   let changed = missingItemIds.size > 0
-  const directoryEntriesByPath = new Map()
   const items = []
-  for (const item of indexedItems) {
-    let next = item
-    if (availableLibraryRoots.get(item?.library)) next = await discoverMatchingSidecars(next, directoryEntriesByPath)
-    if (item?.kind === 'book' && item.cover && !getCurrentArchiveCoverPath(item)) next = { ...next, cover: '' }
-    if (
-      item?.kind === 'video' &&
-      isPosterLibrary(item.library) &&
-      typeof item.cover === 'string' &&
-      item.cover.includes(generatedVideoCoverUrl)
-    ) {
-      next = { ...next, cover: '', episodeCover: item.cover }
-    }
-    if (next !== item) changed = true
+  for (const [index, next] of normalizedItems.entries()) {
+    if (next !== indexedItems[index]) changed = true
     items.push(next)
   }
   let normalized = data
@@ -824,21 +869,7 @@ async function clearEmptyMediaDirectories() {
 }
 
 async function getDirectoryUsage(directoryPath) {
-  const root = String(directoryPath ?? '').trim()
-  if (!path.isAbsolute(root)) return 0
-
-  async function measure(entryPath) {
-    const stat = await fs.lstat(entryPath).catch(() => null)
-    if (!stat || stat.isSymbolicLink()) return 0
-    if (stat.isFile()) return stat.size
-    if (!stat.isDirectory()) return 0
-    const entries = await fs.readdir(entryPath).catch(() => [])
-    let bytes = 0
-    for (const entry of entries) bytes += await measure(path.join(entryPath, entry))
-    return bytes
-  }
-
-  return measure(root)
+  return measureDirectoryBytes(directoryPath)
 }
 
 async function getLibraryUsage(libraryId) {

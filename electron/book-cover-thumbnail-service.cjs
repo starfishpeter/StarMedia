@@ -97,6 +97,4 @@ function createBookCoverThumbnailService({ nativeImage, writeFileAtomically, cre
 
 module.exports = {
   createBookCoverThumbnailService,
-  createChromiumBookCoverThumbnail,
-  createNativeBookCoverThumbnail,
 }

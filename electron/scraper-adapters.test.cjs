@@ -11,7 +11,7 @@ function createAdapters(fetchWithNetwork, now = () => Date.now()) {
     loadConfig: async () => ({
       scraping: {
         bangumiEndpoint: 'https://bangumi.example',
-        bangumiToken: 'header.eyJleHAiOjIwMDAwMDAwMDB9.signature',
+        bangumiToken: 'personal-access-token',
         hanime1Endpoint: 'https://hanime1.example',
       },
     }),
@@ -87,6 +87,7 @@ test('searches and previews Bangumi subjects through the injected network port',
         airdate: '2026-01-02',
         desc: '<b>单集简介</b>',
       })
+    if (url === 'https://bgm.tv/oauth/token_status') return jsonResponse({ expires: 2000000000 })
     if (url.endsWith('/me')) return jsonResponse({ nickname: 'tester' })
     throw new Error(`unexpected URL: ${url}`)
   })
@@ -131,7 +132,19 @@ test('searches and previews Bangumi subjects through the injected network port',
   ])
   assert.deepEqual(episode, episodes[0])
   assert.equal(token.expiresAt, '2033-05-18T03:33:20.000Z')
-  assert.equal(calls[0].options.headers.Authorization, 'Bearer header.eyJleHAiOjIwMDAwMDAwMDB9.signature')
+  assert.equal(calls.find((call) => call.url === 'https://bgm.tv/oauth/token_status').options.method, 'POST')
+  assert.equal(calls.find((call) => call.url === 'https://bgm.tv/oauth/token_status').options.body, 'access_token=personal-access-token')
+  assert.equal(calls.find((call) => call.url.endsWith('/me')).options.headers.Authorization, 'Bearer personal-access-token')
+})
+
+test('keeps token verification successful when token status has no usable expiry', async () => {
+  const adapters = createAdapters(async (url) => {
+    if (url === 'https://bgm.tv/oauth/token_status') return jsonResponse({ expires: null })
+    if (url.endsWith('/me')) return jsonResponse({ username: 'tester' })
+    throw new Error(`unexpected URL: ${url}`)
+  })
+
+  assert.deepEqual(await adapters.verifyBangumiToken(), { valid: true, expiresAt: null, userName: 'tester' })
 })
 
 test('routes Bangumi requests through its dedicated direct network port', async () => {

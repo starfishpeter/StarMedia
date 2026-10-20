@@ -15,7 +15,6 @@ function isSelectionControl(target: HTMLElement) {
 export function MediaWall({
   items,
   viewMode,
-  deferRendering = false,
   onOpen,
   selectedIds = [],
   onToggleSelection,
@@ -38,8 +37,20 @@ export function MediaWall({
   const selectionAnchorRef = useRef<string | null>(null)
   const virtualFrameRef = useRef<number | null>(null)
   const [virtualRange, setVirtualRange] = useState<VirtualGridRange | null>(null)
+  const [compactLayout, setCompactLayout] = useState(
+    () => typeof window !== 'undefined' && typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 1080px)').matches,
+  )
   const selectedIdSet = useMemo(() => new Set(selectedIds), [selectedIds])
-  const shouldVirtualize = deferRendering && viewMode === 'large' && items.length > 60
+  const shouldVirtualize = viewMode === 'large' && items.length > 60
+
+  useEffect(() => {
+    if (typeof window.matchMedia !== 'function') return
+    const media = window.matchMedia('(max-width: 1080px)')
+    const update = () => setCompactLayout(media.matches)
+    update()
+    media.addEventListener('change', update)
+    return () => media.removeEventListener('change', update)
+  }, [])
 
   useLayoutEffect(() => {
     if (!shouldVirtualize) {
@@ -60,7 +71,7 @@ export function MediaWall({
         containerWidth: measuredRoot.clientWidth,
         viewportHeight: scrollContainer.clientHeight,
         scrollOffset: scrollerBounds.top - rootBounds.top,
-        compact: window.matchMedia('(max-width: 1080px)').matches,
+        compact: compactLayout,
         overscanRows: 4,
       })
       setVirtualRange((current) =>
@@ -95,7 +106,7 @@ export function MediaWall({
       if (virtualFrameRef.current !== null) window.cancelAnimationFrame(virtualFrameRef.current)
       virtualFrameRef.current = null
     }
-  }, [items.length, shouldVirtualize])
+  }, [compactLayout, items.length, shouldVirtualize])
 
   const cancelDragSelection = useEffectEvent(() => {
     const state = dragStateRef.current

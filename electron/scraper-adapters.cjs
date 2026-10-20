@@ -131,19 +131,6 @@ function toBangumiEpisode(episode) {
   }
 }
 
-function getTokenExpiry(token) {
-  const parts = String(token ?? '')
-    .trim()
-    .split('.')
-  if (parts.length !== 3) return null
-  try {
-    const expiresAt = Number(JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'))?.exp)
-    return Number.isFinite(expiresAt) && expiresAt > 0 ? new Date(expiresAt * 1000).toISOString() : null
-  } catch {
-    return null
-  }
-}
-
 function getHanime1Root(endpoint) {
   const parsed = new URL(String(endpoint).trim())
   if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error('Hanime1 地址必须使用 HTTP 或 HTTPS')
@@ -318,6 +305,25 @@ function createScraperAdapters({
     return response.json()
   }
 
+  async function requestBangumiTokenStatus(token) {
+    let response
+    try {
+      response = await fetchBangumi('https://bgm.tv/oauth/token_status', {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/x-www-form-urlencoded',
+          'User-Agent': `${appVersion} (desktop media library)`,
+        },
+        body: `access_token=${encodeURIComponent(token)}`,
+      })
+    } catch (error) {
+      throw new Error(`无法连接 Bangumi：${error.message}`, { cause: error })
+    }
+    if (!response.ok) throw new Error(`Bangumi 令牌验证失败（${response.status}）`)
+    return response.json()
+  }
+
   async function getBangumiSubject(subjectId) {
     const config = await loadConfig()
     return { config, subject: await requestBangumi(config, `/subjects/${subjectId}`, { headers: getBangumiHeaders(config) }) }
@@ -366,10 +372,14 @@ function createScraperAdapters({
     const config = await loadConfig()
     const token = String(config?.scraping?.bangumiToken ?? '').trim()
     if (!token) throw new Error('请先粘贴访问令牌')
+    const tokenStatus = await requestBangumiTokenStatus(token)
     const profile = await requestBangumi(config, '/me', { headers: getBangumiHeaders(config) })
+    const expiresAtSeconds = Number(tokenStatus?.expires)
+    const expiresAt = new Date(expiresAtSeconds * 1000)
     return {
       valid: true,
-      expiresAt: getTokenExpiry(token),
+      expiresAt:
+        Number.isFinite(expiresAtSeconds) && expiresAtSeconds > 0 && !Number.isNaN(expiresAt.getTime()) ? expiresAt.toISOString() : null,
       userName: String(profile?.nickname ?? profile?.username ?? profile?.user?.nickname ?? profile?.user?.username ?? '').trim(),
     }
   }
@@ -474,15 +484,12 @@ function createScraperAdapters({
 
 module.exports = {
   createScraperAdapters,
-  extractBangumiStudio,
   getBangumiImageUrl,
   getHanime1Root,
   makeBangumiScrapeFields,
   makeHanimeScrapeFields,
-  normalizeScraperText,
   parseHanime1Id,
   parseHanime1Page,
   parseHanime1SearchResults,
-  stripHtml,
   toFreeAnimeHentaiSubject,
 }

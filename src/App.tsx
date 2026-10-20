@@ -192,29 +192,47 @@ function App() {
     [activeLibrary, allMedia],
   )
   const queryItems = query.trim() ? scopeItems : browsingItems
+  const mediaSearchTextById = useMemo(
+    () =>
+      new Map(
+        allMedia.map((item) => [
+          item.id,
+          [
+            item.title,
+            getMediaAffiliation(item),
+            getMediaEpisode(item),
+            item.creator,
+            item.studio,
+            item.originalTitle,
+            item.tags.join(' '),
+            libraryById[item.library].label,
+          ]
+            .join(' ')
+            .toLocaleLowerCase(),
+        ]),
+      ),
+    [allMedia],
+  )
+  const libraryUsageKey = useMemo(() => {
+    if (!activeLibrary) return ''
+    const items = allMedia.filter((item) => item.library === activeLibrary.id)
+    let mediaBytes = 0
+    let sidecarCount = 0
+    let sidecarBytes = 0
+    for (const item of items) {
+      mediaBytes += item.size || 0
+      if (!Array.isArray(item.sidecars)) continue
+      sidecarCount += item.sidecars.length
+      for (const sidecar of item.sidecars) sidecarBytes += sidecar.size || 0
+    }
+    return `${activeLibrary.id}\0${activeLibraryRoot}\0${items.length}\0${mediaBytes}\0${sidecarCount}\0${sidecarBytes}`
+  }, [activeLibrary, activeLibraryRoot, allMedia])
   const visibleItems = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase()
-    const items = queryItems.filter((item) => {
-      const matchesSearch =
-        !normalizedQuery ||
-        [
-          item.title,
-          getMediaAffiliation(item),
-          getMediaEpisode(item),
-          item.creator,
-          item.studio,
-          item.originalTitle,
-          item.tags.join(' '),
-          libraryById[item.library].label,
-        ]
-          .join(' ')
-          .toLocaleLowerCase()
-          .includes(normalizedQuery)
-      return matchesSearch
-    })
+    const items = queryItems.filter((item) => !normalizedQuery || Boolean(mediaSearchTextById.get(item.id)?.includes(normalizedQuery)))
 
     return [...items].sort((left, right) => compareMediaItems(left, right, sortMode, sortDirection))
-  }, [query, queryItems, sortDirection, sortMode])
+  }, [mediaSearchTextById, query, queryItems, sortDirection, sortMode])
 
   const isAffiliationLibrary = Boolean(activeLibrary && !isArchiveLibrary(activeLibrary.id))
   const isShelfLibrary = Boolean(activeLibrary && isArchiveLibrary(activeLibrary.id))
@@ -264,7 +282,7 @@ function App() {
 
   useEffect(() => {
     const libraryId = activeLibrary?.id
-    if (!libraryId || !window.starMedia?.getLibraryUsage) {
+    if (!libraryId || !libraryUsageKey || !window.starMedia?.getLibraryUsage) {
       setLibraryUsageBytes(null)
       return
     }
@@ -281,7 +299,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [activeLibrary?.id, activeLibraryRoot, libraryItems])
+  }, [activeLibrary?.id, libraryUsageKey])
 
   useEffect(() => {
     currentConfigRef.current = config

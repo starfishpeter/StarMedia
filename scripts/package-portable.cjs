@@ -21,10 +21,6 @@ function assertImmediateChild(target, parent) {
   }
 }
 
-function quotePowerShell(value) {
-  return `'${String(value).replaceAll("'", "''")}'`
-}
-
 async function copyDirectory(source, destination) {
   await fs.cp(source, destination, { recursive: true, force: true })
 }
@@ -165,7 +161,6 @@ async function packagePortableApplication() {
   await copyDirectory(path.join(workspaceRoot, 'dist'), path.join(applicationRoot, 'dist'))
   await copyDirectory(path.join(workspaceRoot, 'electron'), path.join(applicationRoot, 'electron'))
   await copyDirectory(path.join(workspaceRoot, 'build'), path.join(applicationRoot, 'build'))
-  await copyDirectory(path.join(workspaceRoot, 'src', 'assets'), path.join(applicationRoot, 'src', 'assets'))
   await fs.copyFile(path.join(workspaceRoot, 'package.json'), path.join(applicationRoot, 'package.json'))
 
   const runtimeModules = ['7zip-bin', 'libass-wasm', 'yauzl', 'pend']
@@ -178,16 +173,11 @@ async function packagePortableApplication() {
   await normalizeStagingTimestamps()
   await verifyStagingTimestamps()
 
-  execFileSync(
-    'powershell.exe',
-    [
-      '-NoProfile',
-      '-NonInteractive',
-      '-Command',
-      `Compress-Archive -LiteralPath ${quotePowerShell(productDirectory)} -DestinationPath ${quotePowerShell(archivePath)} -Force`,
-    ],
-    { stdio: 'inherit', windowsHide: true },
-  )
+  execFileSync(path7za, ['a', '-tzip', '-mx=5', '-y', archivePath, productName], {
+    cwd: stagingDirectory,
+    stdio: 'inherit',
+    windowsHide: true,
+  })
 
   const archiveStat = await fs.stat(archivePath)
   if (archiveStat.size < 30 * 1024 * 1024) throw new Error('生成的 ZIP 体积异常')

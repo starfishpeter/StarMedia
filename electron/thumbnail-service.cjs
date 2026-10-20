@@ -40,16 +40,6 @@ function getCurrentArchiveCoverPath(item) {
   }
 }
 
-function hasUsableArchiveCover(item, syncFileSystem) {
-  const coverPath = getCurrentArchiveCoverPath(item)
-  if (!coverPath) return false
-  try {
-    return syncFileSystem.statSync(coverPath).isFile()
-  } catch {
-    return false
-  }
-}
-
 async function hasUsableArchiveCoverAsync(item, fileSystem) {
   const coverPath = getCurrentArchiveCoverPath(item)
   if (!coverPath) return false
@@ -365,8 +355,4 @@ function createThumbnailService({
 module.exports = {
   createThumbnailService,
   getCurrentArchiveCoverPath,
-  getThumbnailConcurrency,
-  hasUsableArchiveCover,
-  hasUsableArchiveCoverAsync,
-  mapWithConcurrency,
 }

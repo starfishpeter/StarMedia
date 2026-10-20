@@ -3,13 +3,55 @@ const assert = require('node:assert/strict')
 const fs = require('node:fs/promises')
 const os = require('node:os')
 const path = require('node:path')
-const { clearCacheDirectory, collectFiles, pruneCacheDirectory, touchCacheFile } = require('./cache-service.cjs')
+const {
+  clearCacheDirectory,
+  collectFiles,
+  mapWithConcurrency,
+  measureDirectoryBytes,
+  pruneCacheDirectory,
+  touchCacheFile,
+} = require('./cache-service.cjs')
 
 async function createSandbox(t) {
   const root = await fs.mkdtemp(path.join(os.tmpdir(), 'starmedia-cache-service-test-'))
   t.after(() => fs.rm(root, { recursive: true, force: true }))
   return root
 }
+
+test('maps values with a bounded worker pool and preserves order', async () => {
+  const seen = []
+  const result = await mapWithConcurrency(
+    [1, 2, 3, 4, 5],
+    async (value) => {
+      seen.push(value)
+      await new Promise((resolve) => setTimeout(resolve, 5 - value))
+      return value * 2
+    },
+    2,
+  )
+  assert.deepEqual(result, [2, 4, 6, 8, 10])
+  assert.deepEqual(
+    seen.sort((left, right) => left - right),
+    [1, 2, 3, 4, 5],
+  )
+})
+
+test('measures nested directory bytes without following symbolic links', async (t) => {
+  const root = await createSandbox(t)
+  const nested = path.join(root, 'nested', 'folder')
+  await fs.mkdir(nested, { recursive: true })
+  await fs.writeFile(path.join(root, 'a.bin'), '1234')
+  await fs.writeFile(path.join(nested, 'b.bin'), '567890')
+  const linkPath = path.join(root, 'link.bin')
+  try {
+    await fs.symlink(path.join(root, 'a.bin'), linkPath)
+  } catch {
+    // Windows may refuse unprivileged symlinks; the byte total still has to ignore missing links.
+  }
+
+  assert.equal(await measureDirectoryBytes(root), 10)
+  assert.equal(await measureDirectoryBytes('relative'), 0)
+})
 
 test('prunes the oldest unprotected files and removes their empty directories', async (t) => {
   const root = await createSandbox(t)
